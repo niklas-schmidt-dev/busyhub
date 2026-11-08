@@ -80,6 +80,7 @@ These apps come with BusyHub. Each one is a folder in [`apps/`](apps):
 | App | What it does | Runs on | By |
 | --- | --- | --- | --- |
 | [**Bounce**](apps/bounce) | A pixel ball with a trail. Spin the wheel to speed it up. | Bar · Computer | [@niklas-schmidt-dev](https://github.com/niklas-schmidt-dev) |
+| [**Reaktionsspiel**](apps/reaction-game) | Wait for LOS!, then hit Start. A first app to change with kids, in German. | Bar · Computer | [@niklas-schmidt-dev](https://github.com/niklas-schmidt-dev) |
 | [**Spend Meter**](apps/spend-meter) | Your AI spend against a budget. Point it at Passcard's read API. | Computer · Bar | [@niklas-schmidt-dev](https://github.com/niklas-schmidt-dev) |
 <!-- apps:end -->
 

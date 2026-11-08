@@ -1,0 +1,39 @@
+{
+  "format_version": 1,
+  "version": 1,
+  "fields": {
+    "wait_min": {
+      "type": "integer",
+      "label": "Wartezeit von (ms)",
+      "description": "So lange zeigt die Bar mindestens WARTE. 1000 ms sind 1 Sekunde.",
+      "default": 1500,
+      "min": 500,
+      "max": 10000,
+      "step": 100
+    },
+    "wait_max": {
+      "type": "integer",
+      "label": "Wartezeit bis (ms)",
+      "description": "So lange zeigt die Bar hoechstens WARTE. Dazwischen entscheidet der Zufall.",
+      "default": 4000,
+      "min": 500,
+      "max": 10000,
+      "step": 100
+    },
+    "color_wait": {
+      "type": "color",
+      "label": "Farbe WARTE",
+      "default": "#FFB03B"
+    },
+    "color_go": {
+      "type": "color",
+      "label": "Farbe LOS!",
+      "default": "#3DDC84"
+    },
+    "color_early": {
+      "type": "color",
+      "label": "Farbe ZU FRUEH",
+      "default": "#FF5A4F"
+    }
+  }
+}
