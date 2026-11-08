@@ -70,10 +70,14 @@ export class Updater {
       this.#set({ state: 'ready', version: info.version })
     })
     autoUpdater.on('error', (err) => {
-      // Offline checks fail quietly; a download that breaks off says so and is tried again at the next check.
-      if (this.#status.state !== 'downloading') return
-      this.#log('warn', `Could not download BusyHub ${this.#status.version}: ${err.message}`)
-      this.#set({ state: 'idle' })
+      // Offline checks fail quietly. A download that breaks off is tried again at the next check; an install that
+      // fails, such as a canceled password prompt, stays ready to restart again.
+      if (this.#status.state === 'downloading') {
+        this.#log('warn', `Could not download BusyHub ${this.#status.version}: ${err.message}`)
+        this.#set({ state: 'idle' })
+      } else if (this.#status.state === 'ready') {
+        this.#log('warn', `Could not install BusyHub ${this.#status.version}: ${err.message}`)
+      }
     })
   }
 
