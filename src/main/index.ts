@@ -233,12 +233,17 @@ app.whenReady().then(async () => {
   })
 
   // An AppImage update starts the new copy before this one quits, so the cleanup runs first and frees the
-  // single-instance lock; otherwise the new copy would find this one still running and exit.
+  // single-instance lock; otherwise the new copy would find this one still running and exit. Other updates install
+  // before BusyHub quits and clean up on the way out, so a canceled password prompt (deb) leaves BusyHub running.
   ipcMain.handle('hub:installUpdate', async () => {
-    if (updater.status.state === 'ready') {
+    if (updater.status.state === 'ready' && process.env.APPIMAGE) {
       quitting = true
       await shutdown()
       app.releaseSingleInstanceLock()
+      updater.install()
+      // With the cleanup done BusyHub quits either way; a failed install is tried again as it quits.
+      setImmediate(() => app.quit())
+      return
     }
     updater.install()
   })
