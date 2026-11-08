@@ -99,7 +99,9 @@ pnpm version minor -m "Release %s"   # or patch / major
 git push --follow-tags
 ```
 
-The release workflow builds the installers for macOS, Windows and Linux and publishes them as a GitHub release. Each installer carries a snapshot of the catalog, so a first start without a connection still has the official apps.
+The release workflow builds the installers for macOS, Windows and Linux and publishes them as a GitHub release, together with the `latest*.yml` files and block maps that installed copies read to update themselves. Each installer carries a snapshot of the catalog, so a first start without a connection still has the official apps.
+
+The macOS build is signed with the Developer ID and notarized when the signing secrets are set; [docs/macos-signing.md](docs/macos-signing.md) lists them. Without them it is ad-hoc signed and only tells people that an update is out.
 
 Releases are for BusyHub itself. Adding, updating or removing an app only needs a merge to `main`: the catalog workflow (`.github/workflows/catalog.yml`) publishes `catalog.json` and the app packages to GitHub Pages, and every BusyHub picks them up the next time it checks, at start and every six hours.
 

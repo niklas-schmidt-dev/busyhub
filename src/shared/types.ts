@@ -138,12 +138,23 @@ export interface HubSnapshot {
   modes: Record<string, RunMode>
 }
 
+/**
+ * BusyHub's own update. manual: a newer version exists, but this install cannot replace itself (a Mac build without a
+ * Developer ID signature, for one), so BusyHub points to the release page instead.
+ */
+export type UpdateStatus =
+  | { state: 'idle' }
+  | { state: 'downloading'; version: string; percent: number }
+  | { state: 'ready'; version: string }
+  | { state: 'manual'; version: string; url: string }
+
 export type HubEvent =
   | { type: 'apps'; apps: AppEntry[] }
   | { type: 'runs'; runs: RunState[] }
   | { type: 'status'; status: BarStatus }
   | { type: 'catalog'; status: CatalogStatus }
   | { type: 'log'; line: LogLine }
+  | { type: 'update'; status: UpdateStatus }
 
 /** What the preload script exposes as window.hub. */
 export interface HubApi {
@@ -153,6 +164,10 @@ export interface HubApi {
   connect(addr: string, password: string | null): Promise<BarStatus>
   /** Checks the online catalog for new apps and updates. */
   refreshCatalog(): Promise<CatalogStatus>
+  /** BusyHub's own update, as far as it got. */
+  updateStatus(): Promise<UpdateStatus>
+  /** Restarts into a downloaded update, or opens the release page when this install cannot update itself. */
+  installUpdate(): Promise<void>
   /** Downloads an official app, or its newer version, so it also runs offline. */
   download(id: string): Promise<void>
   /** Address and password for the renderer's live state stream. */
