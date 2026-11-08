@@ -88,8 +88,8 @@ export class Hub {
     }
   }
 
-  streamConfig(): { addr: string; password: string | null } {
-    return { addr: this.#bar.base.host, password: this.#bar.password }
+  streamConfig(): { addr: string; origin: string; password: string | null } {
+    return { addr: this.#bar.base.host, origin: this.#bar.base.origin, password: this.#bar.password }
   }
 
   appDir(id: string): string | null {

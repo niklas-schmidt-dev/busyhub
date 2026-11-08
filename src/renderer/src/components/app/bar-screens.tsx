@@ -1,10 +1,14 @@
-import { Display, LocalStateStream, ScreenRenderer, type ProcessedFrame } from '@busy-app/busy-lib'
+import { Display, LocalStateStream, ScreenRenderer, convertL4toRGBA, type ProcessedFrame } from '@busy-app/busy-lib'
 import { useEffect, useRef, useState, type WheelEvent } from 'react'
 import { cn } from 'cn'
 import type { ButtonKey, RawInput } from '../../../../shared/types.ts'
 
 const FRONT = { width: 72, height: 16 }
 const BACK = { width: 160, height: 80 }
+/** The back screen as /api/screen sends it: 4-bit gray, two pixels per byte. */
+const BACK_BYTES = (BACK.width * BACK.height) / 2
+/** The state stream carries only the front screen, so the back is fetched this often while the window is visible. */
+const BACK_POLL_MS = 200
 /** Wheel ticks on the preview are batched so a trackpad flick does not fire hundreds of steps. */
 const WHEEL_STEP_PX = 40
 
@@ -32,8 +36,9 @@ function toRaw(input: StreamInput): RawInput | null {
 export type StreamState = 'off' | 'connecting' | 'live' | 'error'
 
 /**
- * Mirrors the bar's two screens from its state stream and forwards the bar's own button and wheel input to runs on this computer.
- * The stream runs only while the bar is online; the password stays in the main process until the stream asks for it.
+ * Mirrors the bar's two screens and forwards the bar's own button and wheel input to runs on this computer.
+ * The front and the input come from the bar's state stream, the back from polling /api/screen (firmware 1.3.1 streams
+ * only the front). Both run only while the bar is online; the password stays in the main process until they ask for it.
  */
 export function BarScreens({
   online,
@@ -56,25 +61,48 @@ export function BarScreens({
     }
     let stream: LocalStateStream | null = null
     let cancelled = false
+    const polling = new AbortController()
     report.current('connecting')
 
     const draw = (frame: ProcessedFrame) => {
       if (!frame.data) return
-      const width = frame.width ?? 0
-      const height = frame.height ?? 0
       // Screen is left out for the front display, protobuf's default.
       if ((frame.screen ?? 0) === 0 && front.current) {
-        ScreenRenderer.renderFrame(Display.FRONT, { canvas: front.current, data: frame.data, width, height })
+        ScreenRenderer.renderFrame(Display.FRONT, { canvas: front.current, data: frame.data, width: frame.width ?? 0, height: frame.height ?? 0 })
         setHasFrame(true)
-      } else if (back.current && width === BACK.width && height === BACK.height) {
-        const ctx = back.current.getContext('2d')
-        if (!ctx) return
-        ctx.putImageData(new ImageData(new Uint8ClampedArray(frame.data), width, height), 0, 0)
       }
     }
 
-    void window.hub.streamConfig().then(async ({ addr, password }) => {
+    // Firmware 1.3.1 sends the pixels base64-encoded although it says image/bmp; raw bytes are taken as they are.
+    const drawBack = (body: Uint8Array) => {
+      const ctx = back.current?.getContext('2d')
+      if (!ctx) return
+      const packed = body.length === BACK_BYTES ? body : Uint8Array.from(atob(new TextDecoder().decode(body).trim()), (c) => c.charCodeAt(0))
+      if (packed.length !== BACK_BYTES) return
+      const rgba = new Uint8ClampedArray(convertL4toRGBA(packed, BACK.width, BACK.height))
+      ctx.putImageData(new ImageData(rgba, BACK.width, BACK.height), 0, 0)
+    }
+
+    // One request at a time, and none while the window is hidden: the bar answers requests one after another.
+    const pollBack = async (origin: string, password: string | null) => {
+      const url = new URL('/api/screen?display=1', origin)
+      const headers: Record<string, string> = password ? { 'X-API-Token': password } : {}
+      while (!cancelled) {
+        if (document.visibilityState === 'visible') {
+          try {
+            const res = await fetch(url, { headers, signal: polling.signal })
+            if (res.ok) drawBack(new Uint8Array(await res.arrayBuffer()))
+          } catch {
+            // A missed frame is fine; the next poll draws the screen again.
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, BACK_POLL_MS))
+      }
+    }
+
+    void window.hub.streamConfig().then(async ({ addr, origin, password }) => {
       if (cancelled) return
+      void pollBack(origin, password)
       stream = new LocalStateStream({ addr, ...(password ? { HTTPAccessPassword: password } : {}) })
       try {
         await stream.start({
@@ -95,6 +123,7 @@ export function BarScreens({
 
     return () => {
       cancelled = true
+      polling.abort()
       void stream?.stop().catch(() => undefined)
     }
   }, [online])
