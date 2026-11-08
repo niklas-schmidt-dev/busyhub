@@ -12,7 +12,7 @@ const APP = manifest.id;
 const REACTION_KEY = "start";
 /** A second press within this time is the same press arriving twice, not a new one. */
 const DOUBLE_PRESS_MS = 100;
-/** A result stays at least this long, so a quick extra press doesn't skip it. */
+/** A result stays at least this long once it is on screen, so a quick extra press doesn't skip it. */
 const RESULT_PAUSE_MS = 600;
 
 const WIDTH = 72;
@@ -126,24 +126,30 @@ const resultScreen = (s: Settings, ms: number): Screen => [
 
 /**
  * Sends one screen at a time, in order. A screen asked for while another is on its way waits, and a newer one replaces it.
- * onShown runs once the bar has accepted the screen; never for a screen that was replaced before it was sent.
+ * onDone runs once the bar has answered for the screen, with ok false if it refused it; never for a screen that was
+ * replaced before it was sent.
  */
 function createDisplay(report: (err: unknown) => void) {
   let sending = false;
   let stopped = false;
-  let next: { screen: Screen; onShown?: () => void } | null = null;
+  let next: { screen: Screen; onDone?: (ok: boolean) => void } | null = null;
 
   const flush = (): void => {
     if (sending || stopped || !next) return;
-    const { screen, onShown } = next;
+    const { screen, onDone } = next;
     next = null;
     sending = true;
     device
       .DisplayDraw({ application_name: APP, priority: 50, elements: screen })
-      .then(() => {
-        if (!stopped) onShown?.();
-      })
-      .catch(report)
+      .then(
+        () => {
+          if (!stopped) onDone?.(true);
+        },
+        (err: unknown) => {
+          report(err);
+          if (!stopped) onDone?.(false);
+        },
+      )
       .finally(() => {
         sending = false;
         flush();
@@ -151,8 +157,8 @@ function createDisplay(report: (err: unknown) => void) {
   };
 
   return {
-    show(screen: Screen, onShown?: () => void): void {
-      next = { screen, onShown };
+    show(screen: Screen, onDone?: (ok: boolean) => void): void {
+      next = { screen, onDone };
       flush();
     },
     stop(): void {
@@ -197,13 +203,21 @@ function main(): void {
     goTimer = setTimeout(() => {
       goTimer = undefined;
       if (round !== thisRound || state !== "waiting") return;
-      display.show(goScreen(settings), () => {
+      display.show(goScreen(settings), (ok) => {
         // The clock starts once the bar has LOS! on screen; until then a press is too early.
-        if (round !== thisRound || state !== "waiting") return;
+        if (!ok || round !== thisRound || state !== "waiting") return;
         state = "go";
         goAt = Date.now();
       });
     }, wartezeit(settings.waitMin, settings.waitMax));
+  };
+
+  // Presses wait until the result is on screen, then a little longer, so a slow draw can't cut it short.
+  const showResult = (screen: Screen): void => {
+    ignoreUntil = Infinity;
+    display.show(screen, () => {
+      ignoreUntil = Date.now() + RESULT_PAUSE_MS;
+    });
   };
 
   const press = (at: number): void => {
@@ -213,13 +227,11 @@ function main(): void {
       case "waiting":
         cancelGo();
         state = "early";
-        ignoreUntil = at + RESULT_PAUSE_MS;
-        display.show(earlyScreen(settings));
+        showResult(earlyScreen(settings));
         break;
       case "go":
         state = "result";
-        ignoreUntil = at + RESULT_PAUSE_MS;
-        display.show(resultScreen(settings, at - goAt));
+        showResult(resultScreen(settings, at - goAt));
         break;
       default:
         startRound();

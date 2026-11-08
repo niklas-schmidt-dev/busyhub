@@ -29,7 +29,7 @@ Each state has its own word, and LOS! and ZU FRUEH also differ in shape (filled 
 
 The clock starts when the bar confirms that LOS! is on its screen and stops when Start goes down (the press, not the release). Reading the clock is the first thing the button handler does, in whole milliseconds.
 
-- **On the bar** the confirmation and the button stay on the device. In four test rounds a program pressed Start over the bar's API about 15 ms after LOS! appeared in the bar's screen buffer; the game showed 12 to 31 ms. Part of that is the test program's own way to the button, so the game's own error stays within roughly 15 ms.
+- **On the bar** the confirmation and the button stay on the device. In five test rounds a program pressed Start over the bar's API 12 to 15 ms after it saw LOS! in the bar's screen buffer; the game showed 12 to 35 ms. The program only looks at the screen every 20 to 30 ms, so this shows the game is right to within a few tens of milliseconds, not more exactly.
 - **On this computer** the confirmation travels back to the computer first, so the clock starts late. Presses about 60 ms after LOS! showed as 22 to 48 ms. It works, but play on the bar.
 - Not measured: how long the LEDs take to light after the screen buffer changes, and how long the button takes to register. Both add a little.
 
