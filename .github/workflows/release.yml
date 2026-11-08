@@ -65,7 +65,7 @@ jobs:
           path: |
             release/BusyHub-*.dmg
             release/BusyHub-*.zip
-            release/BusyHub-*.exe
+            release/BusyHub-windows-*-setup.exe
             release/BusyHub-*.AppImage
             release/BusyHub-*.deb
           if-no-files-found: error

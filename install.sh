@@ -39,8 +39,14 @@ install_macos() {
   file="BusyHub-mac-$ARCH.zip"
   download "$file"
   ditto -x -k "$TMP/$file" "$TMP/app"
-  dest="${BUSYHUB_INSTALL_DIR:-/Applications}"
-  if [ ! -w "$dest" ]; then dest="$HOME/Applications"; fi
+  # A folder you name is used as is; otherwise /Applications, or ~/Applications without write access there.
+  if [ -n "${BUSYHUB_INSTALL_DIR:-}" ]; then
+    dest="$BUSYHUB_INSTALL_DIR"
+  elif [ -w /Applications ]; then
+    dest="/Applications"
+  else
+    dest="$HOME/Applications"
+  fi
   mkdir -p "$dest"
   rm -rf "$dest/BusyHub.app"
   mv "$TMP/app/BusyHub.app" "$dest/BusyHub.app"
