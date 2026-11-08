@@ -17,6 +17,8 @@ A reaction game in German, made to change together with kids who have never prog
 
 Each state has its own word, and LOS! and ZU FRUEH also differ in shape (filled screen, frame), so color is never the only clue. The bar's fonts have no umlauts, hence FRUEH.
 
+The back display is for whoever runs the game, since the players face the front: it counts down to LOS! in tenths of a second and shows the wait chance picked, then the result in milliseconds, or how many seconds too early Start was pressed.
+
 **Settings:** the shortest and longest wait in milliseconds, and the colors of WARTE, LOS! and ZU FRUEH.
 
 ## Change it

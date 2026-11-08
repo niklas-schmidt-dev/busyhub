@@ -14,12 +14,15 @@ const REACTION_KEY = "start";
 const DOUBLE_PRESS_MS = 100;
 /** A result stays at least this long once it is on screen, so a quick extra press doesn't skip it. */
 const RESULT_PAUSE_MS = 600;
+/** How often the countdown on the back display updates; each update is one draw. */
+const COUNTDOWN_MS = 100;
 
 const WIDTH = 72;
 const HEIGHT = 16;
 const WHITE = "#FFFFFFFF";
 const BLACK = "#000000FF";
 const NONE = "#00000000";
+const DIM = "#FFFFFF80";
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
@@ -64,14 +67,16 @@ async function loadSettings(): Promise<Settings> {
   }
 }
 
-// ─── Screens: what the 72×16 front display shows in each state ───────────────
+// ─── Screens: the 72×16 front for the players, the 160×80 back for whoever runs the game ───
 
 /**
- * Every screen is the same three elements. The bar keeps an element until one with the same id is drawn again,
- * so a screen that left one out would show the previous screen's.
+ * Every screen is the same six elements, three per display. The bar keeps an element until one with the same id is
+ * drawn again, so a screen that left one out would show the previous screen's.
  * Color is never the only signal: each state has its own word, LOS! fills the screen, ZU FRUEH gets a frame.
  */
-type Screen = [RectangleElement, TextElement, TextElement];
+type Front = [RectangleElement, TextElement, TextElement];
+type Back = [TextElement, TextElement, TextElement];
+type Screen = [...Front, ...Back];
 
 function background(fill: string, frame: string): RectangleElement {
   return {
@@ -93,26 +98,52 @@ function label(id: string, text: string, font: TextElement["font"], color: strin
   return { id, type: "text", text, font, color, x, y: HEIGHT / 2, align };
 }
 
-const centered = (text: string, font: TextElement["font"], color: string): Screen => [
+const centered = (text: string, font: TextElement["font"], color: string): Front => [
   background(NONE, NONE),
   label("main", text, font, color, WIDTH / 2, "center"),
   label("note", "", "small", NONE, 0, "mid_left"),
 ];
 
-const readyScreen = (): Screen => centered(TEXTE.start, "normal", WHITE);
+/** The bar's status icons fill the back's right edge, so the text centers in the room left of them. */
+const BACK_CENTER = 72;
 
-const waitingScreen = (s: Settings): Screen => centered(TEXTE.warten, "bold", s.colorWait);
+function backLine(id: string, text: string, font: TextElement["font"], y: number, color = WHITE): TextElement {
+  return { id, type: "text", text, font, color, x: BACK_CENTER, y, align: "center", display: "back" };
+}
+
+/** A label, a big value and a hint. The big font has no lower case, so the unit goes in the label. */
+const back = (label: string, value: string, hint: string): Back => [
+  backLine("back_label", label, "small", 14),
+  backLine("back_value", value, "extra_large", 40),
+  backLine("back_hint", hint, "small", 66, DIM),
+];
+
+/** Milliseconds as seconds with one decimal, never below zero: 2350 → "2.4". */
+const seconds = (ms: number): string => (Math.max(0, ms) / 1000).toFixed(1);
+
+const readyScreen = (): Screen => [
+  ...centered(TEXTE.start, "normal", WHITE),
+  ...back("REAKTIONSSPIEL", "BEREIT", "Start: neue Runde"),
+];
+
+/** The players see WARTE; the back counts down to LOS! and shows the wait chance picked for this round. */
+const waitingScreen = (s: Settings, leftMs: number, waitMs: number): Screen => [
+  ...centered(TEXTE.warten, "bold", s.colorWait),
+  ...back("Sekunden bis LOS!", seconds(leftMs), `Zufallszeit ${seconds(waitMs)} s`),
+];
 
 const goScreen = (s: Settings): Screen => [
   background(s.colorGo, s.colorGo),
   label("main", TEXTE.los, "extra_large", BLACK, WIDTH / 2, "center"),
   label("note", "", "small", NONE, 0, "mid_left"),
+  ...back("LOS! ist da", "JETZT", "die Uhr laeuft"),
 ];
 
-const earlyScreen = (s: Settings): Screen => [
+const earlyScreen = (s: Settings, earlyMs: number): Screen => [
   background(NONE, s.colorEarly),
   label("main", TEXTE.zuFrueh, "bold", s.colorEarly, WIDTH / 2, "center"),
   label("note", "", "small", NONE, 0, "mid_left"),
+  ...back("ZU FRUEH", seconds(earlyMs), "Sekunden vor LOS! gedrueckt"),
 ];
 
 /** The time ends at the same spot every round, the praise starts right of it. */
@@ -120,6 +151,7 @@ const resultScreen = (s: Settings, ms: number): Screen => [
   background(NONE, NONE),
   label("main", `${ms} ms`, "normal", WHITE, 42, "mid_right"),
   label("note", lob(ms), "small", s.colorGo, 46, "mid_left"),
+  ...back("Reaktionszeit in ms", String(ms), lob(ms)),
 ];
 
 // ─── Drawing ─────────────────────────────────────────────────────────────────
@@ -182,6 +214,9 @@ function main(): void {
   /** Counts rounds, so a timer or a draw from an earlier round can tell it is stale. */
   let round = 0;
   let goTimer: ReturnType<typeof setTimeout> | undefined;
+  let countdown: ReturnType<typeof setInterval> | undefined;
+  /** When LOS! is due, and when the bar confirmed it. */
+  let goDue = 0;
   let goAt = 0;
   let ignoreUntil = 0;
   let stopped = false;
@@ -191,7 +226,9 @@ function main(): void {
 
   const cancelGo = (): void => {
     clearTimeout(goTimer);
+    clearInterval(countdown);
     goTimer = undefined;
+    countdown = undefined;
   };
 
   const startRound = (): void => {
@@ -199,17 +236,21 @@ function main(): void {
     round += 1;
     const thisRound = round;
     state = "waiting";
-    display.show(waitingScreen(settings));
+    const waitMs = wartezeit(settings.waitMin, settings.waitMax);
+    goDue = Date.now() + waitMs;
+    const showWaiting = () => display.show(waitingScreen(settings, goDue - Date.now(), waitMs));
+    showWaiting();
+    countdown = setInterval(showWaiting, COUNTDOWN_MS);
     goTimer = setTimeout(() => {
-      goTimer = undefined;
       if (round !== thisRound || state !== "waiting") return;
+      cancelGo();
       display.show(goScreen(settings), (ok) => {
         // The clock starts once the bar has LOS! on screen; until then a press is too early.
         if (!ok || round !== thisRound || state !== "waiting") return;
         state = "go";
         goAt = Date.now();
       });
-    }, wartezeit(settings.waitMin, settings.waitMax));
+    }, waitMs);
   };
 
   // Presses wait until the result is on screen, then a little longer, so a slow draw can't cut it short.
@@ -227,7 +268,7 @@ function main(): void {
       case "waiting":
         cancelGo();
         state = "early";
-        showResult(earlyScreen(settings));
+        showResult(earlyScreen(settings, goDue - at));
         break;
       case "go":
         state = "result";
