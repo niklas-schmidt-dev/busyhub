@@ -141,7 +141,6 @@ app.whenReady().then(async () => {
   ipcMain.handle('hub:refresh', () => hub.refresh())
   ipcMain.handle('hub:refreshCatalog', () => hub.refreshCatalog())
   ipcMain.handle('hub:updateStatus', () => updater.status)
-  ipcMain.handle('hub:installUpdate', () => updater.install())
   ipcMain.handle('hub:download', (_e, id: string) => hub.download(id))
   ipcMain.handle('hub:connect', (_e, addr: string, password: string | null) => hub.connect(addr, password))
   ipcMain.handle('hub:streamConfig', () => hub.streamConfig())
@@ -211,19 +210,37 @@ app.whenReady().then(async () => {
     }
   })
 
-  let quitting = false
-  app.on('before-quit', (event) => {
-    if (quitting) return
-    // Runs on this computer drew on the bar; clear them before the process goes away.
-    event.preventDefault()
-    quitting = true
+  // Runs on this computer drew on the bar; clear them before the process goes away.
+  let shuttingDown: Promise<unknown> | null = null
+  const shutdown = (): Promise<unknown> => {
+    if (shuttingDown) return shuttingDown
     clearInterval(poll)
     clearInterval(catalogPoll)
     clearInterval(updatePoll)
     for (const watcher of watchers.values()) watcher.close()
     // Clearing the bar should be quick; an unreachable bar must not keep BusyHub from quitting.
     const timeout = new Promise((resolve) => setTimeout(resolve, 3000))
-    void Promise.race([hub.shutdown(), timeout]).finally(() => app.quit())
+    shuttingDown = Promise.race([hub.shutdown(), timeout])
+    return shuttingDown
+  }
+
+  let quitting = false
+  app.on('before-quit', (event) => {
+    if (quitting) return
+    event.preventDefault()
+    quitting = true
+    void shutdown().finally(() => app.quit())
+  })
+
+  // An AppImage update starts the new copy before this one quits, so the cleanup runs first and frees the
+  // single-instance lock; otherwise the new copy would find this one still running and exit.
+  ipcMain.handle('hub:installUpdate', async () => {
+    if (updater.status.state === 'ready') {
+      quitting = true
+      await shutdown()
+      app.releaseSingleInstanceLock()
+    }
+    updater.install()
   })
 }).catch((err: unknown) => {
   dialog.showErrorBox('BusyHub could not start', err instanceof Error ? (err.stack ?? err.message) : String(err))
