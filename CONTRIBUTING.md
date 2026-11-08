@@ -36,7 +36,7 @@ Then fill in the placeholders:
 | `hub.json` | `category`, a `tagline` under 100 characters, and `modes` (`device` for the bar, `host` for the computer) |
 | `README.md` | What the app shows, its controls, its settings |
 
-Run `pnpm install` again so the workspace links the new app, then start BusyHub with `pnpm dev`. Your app shows up in the catalog right away. Press **Run**, try it on the bar and on your computer, and edit `src/main.ts` until it does what you want. The [BUSY JS app guide](https://docs.busy.app/bar/dev/js-apps/build) and the two apps in `apps/` show the drawing, input and settings APIs.
+Run `pnpm install` again so the workspace links the new app, then start BusyHub with `pnpm dev`. Your app shows up in the catalog right away. Press **Run**, try it on the bar and on your computer, and edit `src/main.ts` until it does what you want. The [BUSY JS app guide](https://docs.busy.app/bar/dev/js-apps/build) and the apps in `apps/` show the drawing, input and settings APIs; `apps/reaction-game` also shows a game with states and timers.
 
 ### 3. Check it
 

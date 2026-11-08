@@ -252,6 +252,22 @@ importers:
         specifier: 8.1.4
         version: 8.1.4(@types/node@26.6.5)(jiti@2.7.0)
 
+  apps/reaction-game:
+    dependencies:
+      '@busy-app/busy-lib':
+        specifier: ^0.21.1
+        version: 0.21.1
+    devDependencies:
+      '@busy-app/cli':
+        specifier: ^0.6.0
+        version: 0.6.0(@types/node@26.6.5)(jiti@2.7.0)
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 8.1.4
+        version: 8.1.4(@types/node@26.6.5)(jiti@2.7.0)
+
   apps/spend-meter:
     dependencies:
       '@busy-app/busy-lib':
