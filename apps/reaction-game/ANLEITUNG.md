@@ -45,6 +45,8 @@ Ablauf einer Runde: `WARTE` (gelb) → nach einer zufälligen Pause `LOS!` (ganz
 
 Nach dem Beenden zeigt die Bar ihr Menü; dort startet **Start** das Spiel wieder. Nach einer Code-Änderung immer **Run** in BusyHub drücken, sonst läuft auf der Bar noch die alte Version.
 
+**Das hintere Display ist für dich.** Die Kinder schauen auf die Vorderseite; hinten siehst du während `WARTE` die Sekunden bis `LOS!` (in Zehnteln) und die Zufallszeit dieser Runde, danach die Reaktionszeit in Millisekunden oder, bei einem Frühstart, wie viele Sekunden zu früh gedrückt wurde. Ein schöner Moment für die Programmieridee **Zufall**: Bar nach ein paar Runden umdrehen und zeigen, dass das Programm die Zeit schon vorher kennt.
+
 Spielt auf der Bar, nicht **On this computer**: Dort misst das Spiel ungenauer (siehe unten).
 
 ## Zum Einstieg: Zustände
