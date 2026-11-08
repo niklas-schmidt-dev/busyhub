@@ -47,8 +47,11 @@ export class Updater {
     autoUpdater.logger = null
     autoUpdater.autoDownload = false
     autoUpdater.autoInstallOnAppQuit = true
-    // A local server can stand in for the GitHub releases, for testing.
-    if (process.env.BUSYHUB_UPDATE_URL) autoUpdater.setFeedURL({ provider: 'generic', url: process.env.BUSYHUB_UPDATE_URL })
+    // A local server can stand in for the GitHub releases, for testing, also in a development run.
+    if (process.env.BUSYHUB_UPDATE_URL) {
+      autoUpdater.forceDevUpdateConfig = !app.isPackaged
+      autoUpdater.setFeedURL({ provider: 'generic', url: process.env.BUSYHUB_UPDATE_URL })
+    }
 
     autoUpdater.on('update-available', (info) => {
       void this.#mode.then((mode) => {
@@ -86,7 +89,9 @@ export class Updater {
     this.#checking = true
     try {
       autoUpdater.autoDownload = (await this.#mode) === 'auto'
-      await autoUpdater.checkForUpdates()
+      const result = await autoUpdater.checkForUpdates()
+      // A broken download also arrives as the error event above; awaiting it here keeps its rejection handled.
+      await result?.downloadPromise
     } catch {
       // No connection, or GitHub is down: the next check tries again.
     } finally {
@@ -94,6 +99,7 @@ export class Updater {
     }
   }
 
+  /** Restarts into a downloaded update, or opens the release page where this copy can't update itself. */
   install(): void {
     if (this.#status.state === 'ready') autoUpdater.quitAndInstall()
     else if (this.#status.state === 'manual') void shell.openExternal(this.#status.url)
