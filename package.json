@@ -2,7 +2,7 @@
   "name": "busyhub",
   "productName": "BusyHub",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A desktop marketplace for BUSY Bar apps. Run every app on the bar or from your computer.",
   "license": "MIT",
   "author": "Niklas Schmidt (https://github.com/niklas-schmidt-dev)",

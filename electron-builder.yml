@@ -66,4 +66,18 @@ linux:
       arch: [x64, arm64]
   artifactName: BusyHub-linux-${arch}.${ext}
 
+deb:
+  # electron-builder's defaults, plus ALSA, which Electron links against (libasound2t64 since Ubuntu 24.04).
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+    - libasound2t64 | libasound2
+
 publish: null
