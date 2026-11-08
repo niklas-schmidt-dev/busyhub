@@ -16,7 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/reui/alert'
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '@/components/reui/frame'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { hasUpdate } from '@/lib/apps'
+import { appOrigin, hasUpdate } from '@/lib/apps'
 import { compareVersions } from '../../../../shared/version.ts'
 import { errorMessage } from '@/lib/hub'
 import type { AppEntry, LogLine, RunMode, RunState } from '../../../../shared/types.ts'
@@ -41,10 +41,10 @@ const PENDING: Record<string, string> = {
 }
 
 function origin(app: AppEntry): string {
+  if (appOrigin(app) === 'busy') return 'BUSY app'
   if (app.source === 'bar') return 'Only on the bar'
-  if (app.official && app.source === 'catalog') return 'Official app · not downloaded'
-  if (app.official && app.catalog?.latest === null) return 'Official app · no longer in the catalog'
-  if (app.official) return 'Official app'
+  if (app.official && app.catalog?.latest === null) return 'Official BusyHub app · no longer in the catalog'
+  if (app.official) return 'Official BusyHub app'
   if (app.source === 'package') return 'Imported package'
   return `Local project · ${app.dir?.split(/[/\\]/).at(-1) ?? ''}`
 }
@@ -104,7 +104,7 @@ export function AppDetail({
               <span className="truncate">{app.name}</span>
               <RunBadge app={app} run={run} />
             </FrameTitle>
-            <FrameDescription className="truncate text-xs tabular-nums">
+            <FrameDescription className="text-xs text-pretty tabular-nums">
               v{app.version}
               {app.author ? ` · ${app.author}` : ''} · {origin(app)}
             </FrameDescription>
