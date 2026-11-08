@@ -1,0 +1,69 @@
+# Release builds for macOS, Windows and Linux. CI runs `pnpm dist` on each platform (.github/workflows/release.yml).
+appId: dev.niklasschmidt.busyhub
+productName: BusyHub
+copyright: Copyright © 2026 Niklas Schmidt and contributors
+
+directories:
+  output: release
+  buildResources: assets/branding
+
+# electron-vite bundles every dependency into out/, so nothing from node_modules ships.
+files:
+  - out/**
+  - package.json
+
+extraResources:
+  # Official apps, prebuilt by `pnpm apps:build`.
+  - from: build/official
+    to: official
+  # The starter for New app.
+  - from: templates/starter
+    to: template
+    filter:
+      - "**/*"
+      - "!node_modules/**"
+      - "!dist/**"
+
+mac:
+  category: public.app-category.utilities
+  icon: assets/branding/busyhub-icon.icns
+  # No Apple Developer ID yet: an ad-hoc signature lets the app launch on Apple Silicon.
+  # macOS still asks once on first launch (see the README).
+  identity: "-"
+  hardenedRuntime: false
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  artifactName: BusyHub-mac-${arch}.${ext}
+
+dmg:
+  artifactName: BusyHub-mac-${arch}.${ext}
+
+win:
+  icon: assets/branding/favicon.ico
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+  artifactName: BusyHub-windows-${arch}-setup.${ext}
+
+nsis:
+  # One click, per user: no administrator rights needed.
+  oneClick: true
+  perMachine: false
+  artifactName: BusyHub-windows-${arch}-setup.${ext}
+
+linux:
+  icon: assets/branding/busyhub-logo.png
+  category: Utility
+  synopsis: Run your BUSY Bar apps on the bar or from your computer
+  maintainer: Niklas Schmidt <niklas@niklasschmidt.dev>
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64, arm64]
+  artifactName: BusyHub-linux-${arch}.${ext}
+
+publish: null

@@ -1,0 +1,6 @@
+{
+  "category": "Work",
+  "tagline": "Your AI spend against a budget. Point it at Passcard's read API.",
+  "accent": "#3DDC84",
+  "modes": ["host", "device"]
+}

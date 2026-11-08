@@ -1,0 +1,61 @@
+{
+  "format_version": 1,
+  "version": 1,
+  "fields": {
+    "source": {
+      "type": "group",
+      "label": "Source",
+      "fields": {
+        "url": {
+          "type": "string",
+          "label": "JSON URL",
+          "description": "An HTTPS endpoint that returns the current spend as JSON.",
+          "default": ""
+        },
+        "token": {
+          "type": "string",
+          "label": "Bearer token",
+          "description": "Sent as Authorization: Bearer. Leave empty for public endpoints.",
+          "default": "",
+          "sensitive": true
+        },
+        "field": {
+          "type": "string",
+          "label": "Value path",
+          "description": "Dot path to the number in the response, e.g. data.month.usd.",
+          "default": "total"
+        }
+      }
+    },
+    "label": {
+      "type": "string",
+      "label": "Label",
+      "description": "Left of the amount, up to 6 characters.",
+      "default": "AI",
+      "max_length": 6
+    },
+    "budget": {
+      "type": "integer",
+      "label": "Budget",
+      "default": 50,
+      "min": 1,
+      "max": 100000
+    },
+    "currency": {
+      "type": "enum",
+      "label": "Currency",
+      "default": "usd",
+      "options": [
+        { "value": "usd", "label": "US dollar ($)" },
+        { "value": "eur", "label": "Euro (EUR)" }
+      ]
+    },
+    "refresh_minutes": {
+      "type": "integer",
+      "label": "Refresh every (minutes)",
+      "default": 5,
+      "min": 1,
+      "max": 60
+    }
+  }
+}

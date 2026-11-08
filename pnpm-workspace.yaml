@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+
+allowBuilds:
+  electron: true
+  esbuild: true
+  # Squirrel.Windows installer support; BusyHub ships an NSIS installer instead.
+  electron-winstaller: false

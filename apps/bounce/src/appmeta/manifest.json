@@ -1,0 +1,9 @@
+{
+  "format_version": 1,
+  "id": "busyhub.bounce",
+  "name": "Bounce",
+  "version": "0.1.0",
+  "api_version": "27.12.0",
+  "description": "A pixel ball with a trail. Wheel: speed. OK: next color. Start: pause.",
+  "author": "niklas-schmidt-dev"
+}

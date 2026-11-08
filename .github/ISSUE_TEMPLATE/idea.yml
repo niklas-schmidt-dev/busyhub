@@ -1,0 +1,24 @@
+name: Idea
+description: An app you would like in the catalog, or a feature for BusyHub.
+labels: [idea]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What should it do, and why would you use it every day?
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - An app for the catalog
+        - A BusyHub feature
+  - type: checkboxes
+    id: build
+    attributes:
+      label: Building it
+      options:
+        - label: I'd like to build this myself and open a pull request

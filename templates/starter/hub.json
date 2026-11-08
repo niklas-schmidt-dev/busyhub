@@ -1,0 +1,5 @@
+{
+  "category": "My apps",
+  "tagline": "A fresh app. Edit src/main.ts and run it again.",
+  "modes": ["device", "host"]
+}

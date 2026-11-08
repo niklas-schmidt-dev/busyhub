@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }],
+  "compilerOptions": {
+    // Read by the shadcn CLI to place components; the projects above do the type checking.
+    "paths": {
+      "@/*": ["./src/renderer/src/*"]
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "category": "Fun",
+  "tagline": "A pixel ball with a trail. Spin the wheel to speed it up.",
+  "accent": "#FF5A4F",
+  "modes": ["device", "host"]
+}

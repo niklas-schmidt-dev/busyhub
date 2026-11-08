@@ -1,0 +1,9 @@
+{
+  "format_version": 1,
+  "id": "busyhub.spend-meter",
+  "name": "Spend Meter",
+  "version": "0.1.0",
+  "api_version": "27.12.0",
+  "description": "Spend against a budget from any JSON endpoint, e.g. Passcard’s read API. OK: refresh. Back: quit.",
+  "author": "niklas-schmidt-dev"
+}

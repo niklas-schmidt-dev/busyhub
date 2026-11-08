@@ -1,0 +1,93 @@
+name: Release
+
+# Push a tag like v0.2.0 to build installers for every platform and publish them as a GitHub release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  apps:
+    name: Official apps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm apps:check
+      - run: pnpm apps:build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: official-apps
+          path: build/official
+          include-hidden-files: true
+
+  package:
+    name: Package (${{ matrix.name }})
+    needs: apps
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            target: --mac
+          - name: Windows
+            os: windows-latest
+            target: --win
+          - name: Linux
+            os: ubuntu-latest
+            target: --linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: official-apps
+          path: build/official
+      - run: pnpm build
+      - run: pnpm exec electron-builder ${{ matrix.target }} --publish never
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installers-${{ matrix.name }}
+          path: |
+            release/BusyHub-*.dmg
+            release/BusyHub-*.zip
+            release/BusyHub-*.exe
+            release/BusyHub-*.AppImage
+            release/BusyHub-*.deb
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: installers-*
+          path: installers
+          merge-multiple: true
+      - run: ls -la installers
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" installers/*
+          --repo "$GITHUB_REPOSITORY"
+          --title "BusyHub $GITHUB_REF_NAME"
+          --generate-notes

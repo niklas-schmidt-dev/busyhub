@@ -1,0 +1,38 @@
+name: Bug report
+description: Something in BusyHub or a catalog app does not work.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: BusyHub version and operating system
+      placeholder: 0.1.0 on macOS 26, Apple silicon
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Bar firmware
+      description: Shown under the bar's name in BusyHub.
+      placeholder: "1.3.1"
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where the app ran
+      options:
+        - On the bar
+        - On this computer
+        - Not about running an app
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Copy the relevant lines from the app's Logs panel. Leave out passwords and tokens.
+      render: text

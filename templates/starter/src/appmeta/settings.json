@@ -1,0 +1,13 @@
+{
+  "format_version": 1,
+  "version": 1,
+  "fields": {
+    "title": {
+      "type": "string",
+      "label": "Title",
+      "description": "The top line. Empty shows the app name.",
+      "default": "",
+      "max_length": 16
+    }
+  }
+}

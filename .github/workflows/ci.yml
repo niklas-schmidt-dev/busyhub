@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck BusyHub
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test
+      - name: Catalog rules for apps/
+        run: pnpm apps:check
+      - name: README apps table is current
+        run: pnpm apps:readme --check
+      - name: Typecheck every app
+        run: pnpm --filter "./apps/*" exec tsc
+      - name: Build every app
+        run: pnpm apps:build
+      - name: Build BusyHub
+        run: pnpm build

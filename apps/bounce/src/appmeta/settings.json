@@ -1,0 +1,19 @@
+{
+  "format_version": 1,
+  "version": 1,
+  "fields": {
+    "color": {
+      "type": "color",
+      "label": "Ball color",
+      "default": "#FF5A4F"
+    },
+    "speed": {
+      "type": "integer",
+      "label": "Start speed",
+      "description": "Pixels per frame at launch; the wheel changes it while running.",
+      "default": 2,
+      "min": 1,
+      "max": 5
+    }
+  }
+}
