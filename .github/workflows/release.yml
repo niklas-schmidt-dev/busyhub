@@ -59,16 +59,41 @@ jobs:
           name: catalog
           path: build/catalog
       - run: pnpm build
-      - run: pnpm exec electron-builder ${{ matrix.target }} --publish never
+      - name: Package
+        shell: bash
+        env:
+          # With these repository secrets the macOS build is signed with the Developer ID and notarized, so it can
+          # update itself (docs/macos-signing.md). Without them it stays ad-hoc signed. Only the macOS job sees them.
+          MAC_CERTIFICATE: ${{ matrix.name == 'macOS' && secrets.MAC_CERTIFICATE || '' }}
+          MAC_CERTIFICATE_PASSWORD: ${{ matrix.name == 'macOS' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
+          APPLE_ID: ${{ matrix.name == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.name == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.name == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
+        run: |
+          args=(${{ matrix.target }} --publish never)
+          if [ -n "$MAC_CERTIFICATE" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            export CSC_LINK="$MAC_CERTIFICATE" CSC_KEY_PASSWORD="$MAC_CERTIFICATE_PASSWORD"
+            # The Team ID picks the Developer ID certificate over the ad-hoc default in electron-builder.yml.
+            args+=(-c.mac.identity="$APPLE_TEAM_ID")
+          else
+            # electron-builder notarizes whenever these are set, which an ad-hoc build cannot pass.
+            unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          fi
+          pnpm exec electron-builder "${args[@]}"
       - uses: actions/upload-artifact@v7
         with:
           name: installers-${{ matrix.name }}
+          # The latest*.yml files and block maps are what installed copies read to update themselves. Windows
+          # updates through the combined x64 + Arm installer, BusyHub-windows-setup.exe, which latest.yml names.
           path: |
             release/BusyHub-*.dmg
             release/BusyHub-*.zip
             release/BusyHub-windows-*-setup.exe
+            release/BusyHub-windows-setup.exe
             release/BusyHub-*.AppImage
             release/BusyHub-*.deb
+            release/latest*.yml
+            release/*.blockmap
           if-no-files-found: error
 
   publish:

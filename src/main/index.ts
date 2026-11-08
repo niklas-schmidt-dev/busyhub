@@ -7,6 +7,7 @@ import type { HubEvent, RawInput, RunMode, SettingsValues } from '../shared/type
 import { Config } from './config.ts'
 import { HUB_LOG, Hub } from './hub.ts'
 import { DEFAULT_CATALOG_URL, RemoteCatalog } from './remote-catalog.ts'
+import { Updater } from './updater.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const isMac = process.platform === 'darwin'
@@ -15,6 +16,8 @@ const BAR_POLL_MS = 15_000
 const RESCAN_DEBOUNCE_MS = 400
 /** New and updated catalog apps show up without a restart. */
 const CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000
+/** BusyHub looks for a newer version of itself as often. */
+const UPDATE_CHECK_MS = 6 * 60 * 60 * 1000
 
 // Official apps come from the online catalog. A release also ships a snapshot of it (scripts/build-catalog.ts) for
 // a first start without a connection; in development the apps are built straight from the repository's apps/.
@@ -94,6 +97,10 @@ app.whenReady().then(async () => {
     catalog,
     send,
   )
+  const updater = new Updater(
+    (status) => send({ type: 'update', status }),
+    (level, text) => hub?.notice(level, text),
+  )
   if (config.secretsReset) {
     hub.notice('warn', 'The saved bar password and secret settings could not be read on this install. Enter them again.')
   }
@@ -133,6 +140,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('hub:snapshot', () => hub.snapshot())
   ipcMain.handle('hub:refresh', () => hub.refresh())
   ipcMain.handle('hub:refreshCatalog', () => hub.refreshCatalog())
+  ipcMain.handle('hub:updateStatus', () => updater.status)
+  ipcMain.handle('hub:installUpdate', () => updater.install())
   ipcMain.handle('hub:download', (_e, id: string) => hub.download(id))
   ipcMain.handle('hub:connect', (_e, addr: string, password: string | null) => hub.connect(addr, password))
   ipcMain.handle('hub:streamConfig', () => hub.streamConfig())
@@ -190,6 +199,8 @@ app.whenReady().then(async () => {
   void hub.refreshCatalog()
   const poll = setInterval(() => void hub.pollBar(), BAR_POLL_MS)
   const catalogPoll = setInterval(() => void hub.refreshCatalog(), CATALOG_REFRESH_MS)
+  void updater.check()
+  const updatePoll = setInterval(() => void updater.check(), UPDATE_CHECK_MS)
 
   app.on('activate', () => {
     if (!window) {
@@ -208,6 +219,7 @@ app.whenReady().then(async () => {
     quitting = true
     clearInterval(poll)
     clearInterval(catalogPoll)
+    clearInterval(updatePoll)
     for (const watcher of watchers.values()) watcher.close()
     // Clearing the bar should be quick; an unreachable bar must not keep BusyHub from quitting.
     const timeout = new Promise((resolve) => setTimeout(resolve, 3000))

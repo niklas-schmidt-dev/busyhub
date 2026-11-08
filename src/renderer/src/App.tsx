@@ -7,6 +7,7 @@ import { BarPanel } from '@/components/app/bar-panel'
 import { Catalog } from '@/components/app/catalog'
 import { ConnectDialog } from '@/components/app/connect-dialog'
 import { NewAppDialog } from '@/components/app/new-app-dialog'
+import { UpdateButton } from '@/components/app/update-button'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { errorMessage, useHubState } from '@/lib/hub'
@@ -75,6 +76,7 @@ export function App() {
           </div>
         </div>
         <div className="flex items-center gap-2 [-webkit-app-region:no-drag]">
+          <UpdateButton />
           <Button variant="ghost" size="sm" onClick={() => void add(window.hub.importPackage)}>
             <PackagePlusIcon aria-hidden />
             Import package…

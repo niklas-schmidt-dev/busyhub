@@ -68,6 +68,10 @@ curl -fsSL https://raw.githubusercontent.com/niklas-schmidt-dev/busyhub/main/ins
 
 On Debian and Ubuntu the script installs the `.deb` package (it asks for `sudo`). Anywhere else it puts the AppImage in `~/.local/bin` and adds BusyHub to your app menu. Downloads: [.deb x64](https://github.com/niklas-schmidt-dev/busyhub/releases/latest/download/BusyHub-linux-amd64.deb) · [.deb Arm](https://github.com/niklas-schmidt-dev/busyhub/releases/latest/download/BusyHub-linux-arm64.deb) · [AppImage x64](https://github.com/niklas-schmidt-dev/busyhub/releases/latest/download/BusyHub-linux-x86_64.AppImage) · [AppImage Arm](https://github.com/niklas-schmidt-dev/busyhub/releases/latest/download/BusyHub-linux-arm64.AppImage).
 
+### Updates
+
+BusyHub looks for a new version when it starts and every six hours. On Windows and Linux it downloads the update in the background and installs it when you quit BusyHub, or right away with **Restart to update**; a `.deb` install asks for your password to install it. On macOS it does the same once releases are signed with an Apple Developer ID ([docs/macos-signing.md](docs/macos-signing.md)); until then BusyHub shows when a new version is out and links to it.
+
 ### Connect your bar
 
 BusyHub looks for the bar at `10.0.4.20`, its address over **USB**, where no password is needed. To use **Wi-Fi**, open the bar's web settings, turn on **HTTP API → HTTP API access**, then enter the bar's address in **Connection**. If **Password protection** is on, enter that password too. BusyHub encrypts it with your system keychain.
@@ -181,7 +185,7 @@ scripts/         catalog checks, the catalog build, this README's apps table
 - The window's content security policy allows `'unsafe-eval'`, because busy-lib's live-view worker decodes the bar's data with generated code. The window loads only BusyHub's own bundled code and shows app data as plain text.
 - The bar's own buttons reach an app running on your computer through the bar's state stream. Whatever the bar shows at the time sees the same presses.
 - BusyHub only knows an app is running on the bar if it launched it there. If you quit the app on the bar itself (hold Back), BusyHub still shows it as running.
-- Releases are not yet signed by Apple or Microsoft, and BusyHub doesn't update itself yet. Apps update through the catalog.
+- Releases are not yet signed by Apple or Microsoft. An update is checked against the SHA-512 in the release's `latest*.yml`; both come from this repository's GitHub releases. Apps update through the catalog.
 
 Found a security problem? See [SECURITY.md](SECURITY.md).
 
