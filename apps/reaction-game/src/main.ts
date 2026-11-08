@@ -213,8 +213,8 @@ function main(): void {
   let state: State = "ready";
   /** Counts rounds, so a timer or a draw from an earlier round can tell it is stale. */
   let round = 0;
-  let goTimer: ReturnType<typeof setTimeout> | undefined;
-  let countdown: ReturnType<typeof setInterval> | undefined;
+  /** The one timer of a round: it redraws the countdown and, when the wait is over, shows LOS!. */
+  let tickTimer: ReturnType<typeof setTimeout> | undefined;
   /** When LOS! is due, and when the bar confirmed it. */
   let goDue = 0;
   let goAt = 0;
@@ -224,11 +224,11 @@ function main(): void {
   const report = (err: unknown) => console.error(`${APP}: ${err instanceof Error ? err.message : String(err)}`);
   const display = createDisplay(report);
 
+  // Only a pending timer is cleared. On firmware 1.3.1 the bar logs an error for an unknown timer id, and a round
+  // that cleared its own running timeout and an interval together crashed the JS engine (fatal error 120).
   const cancelGo = (): void => {
-    clearTimeout(goTimer);
-    clearInterval(countdown);
-    goTimer = undefined;
-    countdown = undefined;
+    if (tickTimer !== undefined) clearTimeout(tickTimer);
+    tickTimer = undefined;
   };
 
   const startRound = (): void => {
@@ -238,19 +238,23 @@ function main(): void {
     state = "waiting";
     const waitMs = wartezeit(settings.waitMin, settings.waitMax);
     goDue = Date.now() + waitMs;
-    const showWaiting = () => display.show(waitingScreen(settings, goDue - Date.now(), waitMs));
-    showWaiting();
-    countdown = setInterval(showWaiting, COUNTDOWN_MS);
-    goTimer = setTimeout(() => {
+    const tick = (): void => {
+      tickTimer = undefined;
       if (round !== thisRound || state !== "waiting") return;
-      cancelGo();
+      const leftMs = goDue - Date.now();
+      if (leftMs > 0) {
+        display.show(waitingScreen(settings, leftMs, waitMs));
+        tickTimer = setTimeout(tick, Math.min(COUNTDOWN_MS, leftMs));
+        return;
+      }
       display.show(goScreen(settings), (ok) => {
         // The clock starts once the bar has LOS! on screen; until then a press is too early.
         if (!ok || round !== thisRound || state !== "waiting") return;
         state = "go";
         goAt = Date.now();
       });
-    }, waitMs);
+    };
+    tick();
   };
 
   // Presses wait until the result is on screen, then a little longer, so a slow draw can't cut it short.
