@@ -57,6 +57,7 @@ export class Hub {
   readonly #catalog: RemoteCatalog
   readonly #emit: (event: HubEvent) => void
   #bar: Bar
+  #connection = 0
   #status: BarStatus = { state: 'offline', error: 'Not checked yet' }
   #local: AppEntry[] = []
   #barApps: BarApp[] | null = null
@@ -77,7 +78,7 @@ export class Hub {
 
   snapshot(): HubSnapshot {
     return {
-      bar: { addr: this.#config.barAddr, hasPassword: this.#config.barPassword !== null },
+      bar: { addr: this.#config.barAddr, hasPassword: this.#config.barPassword !== null, connection: this.#connection },
       appsFolder: this.#paths.appsFolder,
       catalog: this.#catalog.status,
       status: this.#status,
@@ -158,6 +159,7 @@ export class Hub {
     const next = new Bar(addr, password === null ? this.#config.barPassword : password || null)
     await this.#config.setBar(addr.trim(), password)
     this.#bar = next
+    this.#connection++
     await this.pollBar()
     return this.#status
   }

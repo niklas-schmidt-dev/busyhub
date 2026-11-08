@@ -105,6 +105,8 @@ export type BarStatus =
 export interface BarConfig {
   addr: string
   hasPassword: boolean
+  /** Counts connects since BusyHub started; a new value means a new address or password even while the bar stays online. */
+  connection: number
 }
 
 export interface LogLine {

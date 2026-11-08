@@ -135,7 +135,9 @@ export function BarPanel({
             </AlertAction>
           </Alert>
         )}
+        {/* A new connection starts the screens over, so they never keep mirroring the previous address or password. */}
         <BarScreens
+          key={config?.connection ?? 0}
           online={online}
           onStreamState={(state, reason) => {
             setStream(state)
