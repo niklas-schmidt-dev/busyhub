@@ -50,7 +50,13 @@ Commit the updated `README.md` along with your app.
 
 ### 4. Open a pull request
 
-Push your branch to your fork and open a pull request against `main`. CI runs the same checks and builds every app. A maintainer then tries your app on a real bar and reviews it. Once it's merged, it ships with the next BusyHub release.
+Push your branch to your fork and open a pull request against `main`. CI runs the same checks and builds every app. A maintainer then tries your app on a real bar and reviews it. Once it's merged, the catalog workflow publishes it to GitHub Pages, and it shows up in everyone's BusyHub within minutes. No BusyHub release is needed.
+
+### Update an app
+
+Change the code, then raise `version` in `src/appmeta/manifest.json` and `package.json`. BusyHub offers an update only when the version goes up, so CI fails a pull request that changes an app's `src/` without raising it. Use a patch version for fixes and a minor version for new features.
+
+If the app starts using something only newer BusyHub versions have, set `minHubVersion` in `hub.json` to the first BusyHub version that has it. Older BusyHub versions then keep showing the version they can run, until they're updated.
 
 ### Catalog rules
 
@@ -58,7 +64,8 @@ CI checks these:
 
 - The folder is `apps/<name>`, the app id is `busyhub.<name>`, and the package name is `@busyhub-apps/<name>`.
 - `manifest.json` has a name, a description and an author.
-- `hub.json` has a category, a tagline under 100 characters, and valid `modes`.
+- `hub.json` has a category, a tagline under 100 characters, and valid `modes`. `minHubVersion`, if set, is a BusyHub version like `0.2.0`.
+- A pull request that changes an app's `src/` raises its `version`.
 - `settings.json`, if there is one, follows the [settings schema](https://developer.busy.app/javascript-applications-settings-schema.html): every field has a type, a label and a default.
 - There is a `README.md`.
 
@@ -92,7 +99,9 @@ pnpm version minor -m "Release %s"   # or patch / major
 git push --follow-tags
 ```
 
-The release workflow builds the installers for macOS, Windows and Linux, along with the official apps, and publishes them as a GitHub release.
+The release workflow builds the installers for macOS, Windows and Linux and publishes them as a GitHub release. Each installer carries a snapshot of the catalog, so a first start without a connection still has the official apps.
+
+Releases are for BusyHub itself. Adding, updating or removing an app only needs a merge to `main`: the catalog workflow (`.github/workflows/catalog.yml`) publishes `catalog.json` and the app packages to GitHub Pages, and every BusyHub picks them up the next time it checks, at start and every six hours.
 
 ## Code of conduct
 

@@ -46,29 +46,55 @@ export async function createProject(appsFolder: string, templateDir: string, nam
   return id
 }
 
-/** Unpacks a .tgz built by busy-cli into packagesDir/<id>/, next to a copy of the archive. */
-export async function importPackage(tgz: string, packagesDir: string, log: Log): Promise<string> {
+export interface UnpackOptions {
+  /** Refuse a package with another id or version, e.g. when the catalog says what it must hold. */
+  expect?: { id: string; version: string }
+  /** Extra files written next to the package, such as the catalog's hub.json. */
+  extraFiles?: Record<string, string>
+}
+
+/**
+ * Unpacks a .tgz built by busy-cli into packagesDir/<id>/, next to a copy of the archive.
+ * The new folder is assembled beside the old one and swapped in at the end, so a failed update leaves the app as it was.
+ */
+export async function unpackPackage(tgz: string, packagesDir: string, log: Log, options: UnpackOptions = {}): Promise<{ id: string; version: string }> {
   mkdirSync(packagesDir, { recursive: true })
-  const staging = mkdtempSync(join(packagesDir, '.import-'))
+  const staging = mkdtempSync(join(packagesDir, '.unpack-'))
   try {
+    const content = join(staging, 'content')
+    mkdirSync(content)
     // bsdtar (macOS, Windows) and GNU tar both refuse absolute paths and ../ entries by default.
-    await runCommand('tar', ['-xzf', tgz, '-C', staging], staging, log)
-    const roots = readdirSync(staging, { withFileTypes: true }).filter((entry) => entry.isDirectory())
-    const root = roots.find((entry) => existsSync(join(staging, entry.name, 'appmeta', 'manifest.json')))
+    await runCommand('tar', ['-xzf', tgz, '-C', content], content, log)
+    const roots = readdirSync(content, { withFileTypes: true }).filter((entry) => entry.isDirectory())
+    const root = roots.find((entry) => existsSync(join(content, entry.name, 'appmeta', 'manifest.json')))
     if (!root || roots.length !== 1) throw new Error('The package must hold exactly one <id>/ folder with appmeta/manifest.json')
-    const { id } = parseManifest(JSON.parse(readFileSync(join(staging, root.name, 'appmeta', 'manifest.json'), 'utf8')))
+    const { id, version } = parseManifest(JSON.parse(readFileSync(join(content, root.name, 'appmeta', 'manifest.json'), 'utf8')))
     if (root.name !== id) throw new Error(`The package folder ${root.name} does not match the app id ${id}`)
+    if (options.expect && (options.expect.id !== id || options.expect.version !== version)) {
+      throw new Error(`The package holds ${id} ${version}, not ${options.expect.id} ${options.expect.version}`)
+    }
+
+    const next = join(staging, 'next')
+    mkdirSync(next)
+    renameSync(join(content, id), join(next, id))
+    cpSync(tgz, join(next, 'package.tgz'))
+    // The built scripts are ES modules; this lets a run on this computer import them.
+    writeFileSync(join(next, 'package.json'), '{ "type": "module" }\n')
+    for (const [name, text] of Object.entries(options.extraFiles ?? {})) writeFileSync(join(next, name), text)
 
     const dest = join(packagesDir, id)
-    rmSync(dest, { recursive: true, force: true })
-    mkdirSync(dest)
-    renameSync(join(staging, id), join(dest, id))
-    cpSync(tgz, join(dest, 'package.tgz'))
-    // The built scripts are ES modules; this lets a run on this computer import them.
-    writeFileSync(join(dest, 'package.json'), '{ "type": "module" }\n')
-    log('info', `Imported ${basename(tgz)} as ${id}`)
-    return id
+    const previous = join(staging, 'previous')
+    if (existsSync(dest)) renameSync(dest, previous)
+    renameSync(next, dest)
+    return { id, version }
   } finally {
     rmSync(staging, { recursive: true, force: true })
   }
+}
+
+/** Imports a .tgz you picked into packagesDir/<id>/. */
+export async function importPackage(tgz: string, packagesDir: string, log: Log): Promise<string> {
+  const { id } = await unpackPackage(tgz, packagesDir, log)
+  log('info', `Imported ${basename(tgz)} as ${id}`)
+  return id
 }

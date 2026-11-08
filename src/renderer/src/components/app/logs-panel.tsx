@@ -90,7 +90,7 @@ export function LogsPanel({ lines }: { lines: LogLine[] }) {
           className="h-72 overflow-y-auto overscroll-contain rounded-lg bg-muted/40 font-mono text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           {visible.length === 0 ? (
-            <Empty className="h-full">
+            <Empty className="h-full font-sans text-sm">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
                   <ScrollTextIcon aria-hidden />

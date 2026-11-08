@@ -1,10 +1,13 @@
 // The contract between the main process, the preload bridge and the renderer.
 
-/** Where an app runs: installed on the bar, or as a script on this Mac that drives the bar over HTTP. */
+/** Where an app runs: installed on the bar, or as a script on this computer that drives the bar over HTTP. */
 export type RunMode = 'device' | 'host'
 
-/** How the hub gets an app's build: from a source project, from a built .tgz package, or not at all (it only exists on the bar). */
-export type AppSource = 'project' | 'package' | 'bar'
+/**
+ * How the hub gets an app's build: from a source project, from a built .tgz package, from the online catalog
+ * (listed there but not downloaded yet), or not at all (it only exists on the bar).
+ */
+export type AppSource = 'project' | 'package' | 'catalog' | 'bar'
 
 /** Marketplace metadata from an app's optional hub.json. */
 export interface HubMeta {
@@ -55,8 +58,10 @@ export interface AppEntry {
   description: string
   author: string
   source: AppSource
-  /** Part of BusyHub's own catalog (apps/ in the repository), as opposed to your local apps. */
+  /** Part of BusyHub's official catalog (apps/ in the repository), as opposed to your local apps. */
   official: boolean
+  /** For official apps: the version the catalog offers now, or null when the catalog no longer lists the app. */
+  catalog: { latest: string | null } | null
   /** The project root, or the folder a package was unpacked to. Null for apps that exist only on the bar. */
   dir: string | null
   hub: HubMeta
@@ -75,6 +80,21 @@ export interface RunState {
   status: RunStatus
   detail: string
   at: number
+}
+
+/**
+ * Where the official catalog came from: fetched just now, the copy saved after the last fetch,
+ * the snapshot shipped with BusyHub, or nothing at all.
+ */
+export interface CatalogStatus {
+  state: 'live' | 'cached' | 'bundled' | 'unavailable'
+  url: string
+  /** When the shown catalog was published. */
+  generatedAt: string | null
+  /** When BusyHub last reached the catalog. */
+  fetchedAt: number | null
+  /** Why the last check failed, when it did. */
+  error: string | null
 }
 
 export type BarStatus =
@@ -110,6 +130,7 @@ export interface HubSnapshot {
   bar: BarConfig
   /** Where New app creates projects. */
   appsFolder: string
+  catalog: CatalogStatus
   status: BarStatus
   apps: AppEntry[]
   runs: RunState[]
@@ -121,6 +142,7 @@ export type HubEvent =
   | { type: 'apps'; apps: AppEntry[] }
   | { type: 'runs'; runs: RunState[] }
   | { type: 'status'; status: BarStatus }
+  | { type: 'catalog'; status: CatalogStatus }
   | { type: 'log'; line: LogLine }
 
 /** What the preload script exposes as window.hub. */
@@ -129,6 +151,10 @@ export interface HubApi {
   refresh(): Promise<void>
   /** Saves the bar address; a null password keeps the stored one, an empty string removes it. */
   connect(addr: string, password: string | null): Promise<BarStatus>
+  /** Checks the online catalog for new apps and updates. */
+  refreshCatalog(): Promise<CatalogStatus>
+  /** Downloads an official app, or its newer version, so it also runs offline. */
+  download(id: string): Promise<void>
   /** Address and password for the renderer's live state stream. */
   streamConfig(): Promise<{ addr: string; password: string | null }>
   run(id: string, mode: RunMode): Promise<void>

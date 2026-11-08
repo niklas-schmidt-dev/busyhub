@@ -6,17 +6,23 @@ import appIcon from '../../assets/branding/busyhub-logo.png?asset'
 import type { HubEvent, RawInput, RunMode, SettingsValues } from '../shared/types.ts'
 import { Config } from './config.ts'
 import { HUB_LOG, Hub } from './hub.ts'
+import { DEFAULT_CATALOG_URL, RemoteCatalog } from './remote-catalog.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const isMac = process.platform === 'darwin'
 
 const BAR_POLL_MS = 15_000
 const RESCAN_DEBOUNCE_MS = 400
+/** New and updated catalog apps show up without a restart. */
+const CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000
 
-// A release ships the official apps prebuilt (scripts/build-official-apps.mjs) and the starter as resources;
-// in development both come straight from the repository.
-const official = app.isPackaged ? join(process.resourcesPath, 'official') : join(app.getAppPath(), 'apps')
+// Official apps come from the online catalog. A release also ships a snapshot of it (scripts/build-catalog.ts) for
+// a first start without a connection; in development the apps are built straight from the repository's apps/.
+const official = app.isPackaged ? [] : [join(app.getAppPath(), 'apps')]
+const snapshot = app.isPackaged ? join(process.resourcesPath, 'catalog') : null
 const template = app.isPackaged ? join(process.resourcesPath, 'template') : join(app.getAppPath(), 'templates', 'starter')
+// A fork or a local test server can serve its own catalog.
+const catalogUrl = process.env.BUSYHUB_CATALOG_URL || DEFAULT_CATALOG_URL
 
 let window: BrowserWindow | null = null
 
@@ -67,9 +73,17 @@ app.whenReady().then(async () => {
   const config = await Config.load(join(app.getPath('userData'), 'config.json'))
   const appsFolder = join(app.getPath('documents'), 'BusyHub', 'apps')
   mkdirSync(appsFolder, { recursive: true })
-  const hub = new Hub(
+  let hub: Hub | undefined
+  const catalog = new RemoteCatalog({
+    url: catalogUrl,
+    cacheDir: join(app.getPath('userData'), 'catalog'),
+    bundledDir: snapshot,
+    hubVersion: app.getVersion(),
+    log: (level, text) => hub?.notice(level, text),
+  })
+  hub = new Hub(
     {
-      official: [official],
+      official,
       appsFolder,
       packages: join(app.getPath('userData'), 'packages'),
       template,
@@ -77,6 +91,7 @@ app.whenReady().then(async () => {
       worker: join(here, 'host-worker.js'),
     },
     config,
+    catalog,
     send,
   )
   if (config.secretsReset) {
@@ -117,6 +132,8 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('hub:snapshot', () => hub.snapshot())
   ipcMain.handle('hub:refresh', () => hub.refresh())
+  ipcMain.handle('hub:refreshCatalog', () => hub.refreshCatalog())
+  ipcMain.handle('hub:download', (_e, id: string) => hub.download(id))
   ipcMain.handle('hub:connect', (_e, addr: string, password: string | null) => hub.connect(addr, password))
   ipcMain.handle('hub:streamConfig', () => hub.streamConfig())
   ipcMain.handle('hub:run', (_e, id: string, mode: RunMode) => hub.run(id, mode))
@@ -169,7 +186,10 @@ app.whenReady().then(async () => {
   })
 
   void hub.refresh().then(syncWatchers)
+  // The saved catalog shows at once; the online one replaces it when it arrives.
+  void hub.refreshCatalog()
   const poll = setInterval(() => void hub.pollBar(), BAR_POLL_MS)
+  const catalogPoll = setInterval(() => void hub.refreshCatalog(), CATALOG_REFRESH_MS)
 
   app.on('activate', () => {
     if (!window) {
@@ -187,6 +207,7 @@ app.whenReady().then(async () => {
     event.preventDefault()
     quitting = true
     clearInterval(poll)
+    clearInterval(catalogPoll)
     for (const watcher of watchers.values()) watcher.close()
     // Clearing the bar should be quick; an unreachable bar must not keep BusyHub from quitting.
     const timeout = new Promise((resolve) => setTimeout(resolve, 3000))

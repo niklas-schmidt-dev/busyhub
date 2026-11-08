@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { parseHub, parseManifest, scan, withBarApps } from './catalog.ts'
+import { parseCatalog } from './catalog-feed.ts'
+import { parseHub, parseManifest, scan, withBarApps, withCatalog } from './catalog.ts'
 
 const manifest = (id: string) => ({ format_version: 1, id, name: id.toUpperCase(), version: '0.1.0', api_version: '27.12.0' })
 
@@ -60,6 +61,43 @@ test('scan finds official projects and packages, linked folders and folders of a
   }
 })
 
+test('a source project shadows the downloaded copy of the same official app without a warning', () => {
+  const root = mkdtempSync(join(tmpdir(), 'busyhub-shadow-'))
+  try {
+    write(join(root, 'repo', 'one', 'src', 'appmeta', 'manifest.json'), manifest('one'))
+    write(join(root, 'downloads', 'one', 'package.tgz'), 'tgz')
+    write(join(root, 'downloads', 'one', 'one', 'appmeta', 'manifest.json'), manifest('one'))
+    const result = scan({ official: [join(root, 'repo'), join(root, 'downloads')], local: [] })
+    assert.equal(result.apps.length, 1)
+    assert.equal(result.apps[0]?.source, 'project')
+    assert.deepEqual(result.problems, [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('the catalog adds listed apps and tells downloaded ones the latest version', () => {
+  const pkg = (id: string, version: string) => ({ path: `packages/${id}-${version}.tgz`, sha256: 'a'.repeat(64), size: 10 })
+  const { feed } = parseCatalog({
+    format: 1,
+    apps: [
+      { id: 'one', name: 'One', version: '1.1.0', modes: ['host'], package: pkg('one', '1.1.0') },
+      { id: 'two', name: 'Two', version: '2.0.0', modes: ['device'], category: 'Fun', package: pkg('two', '2.0.0') },
+    ],
+  })
+  const downloaded = { ...baseEntry('one'), source: 'package' as const, official: true, version: '1.0.0' }
+  const gone = { ...baseEntry('old'), source: 'package' as const, official: true }
+  const mine = baseEntry('mine')
+  const merged = withCatalog([downloaded, gone, mine], feed.apps)
+  const byId = new Map(merged.map((a) => [a.id, a]))
+  assert.deepEqual(byId.get('one')?.catalog, { latest: '1.1.0' })
+  assert.deepEqual(byId.get('old')?.catalog, { latest: null })
+  assert.equal(byId.get('mine')?.catalog, null)
+  assert.equal(byId.get('two')?.source, 'catalog')
+  assert.equal(byId.get('two')?.official, true)
+  assert.equal(byId.get('two')?.hub.category, 'Fun')
+})
+
 test('apps that only live on the bar join the catalog as launch-only entries', () => {
   const merged = withBarApps([baseEntry('mine')], [
     { id: 'mine', name: 'Mine', version: '0.2.0', author: '', description: '' },
@@ -81,6 +119,7 @@ function baseEntry(id: string) {
     author: '',
     source: 'project' as const,
     official: false,
+    catalog: null,
     dir: `/apps/${id}`,
     hub: parseHub(undefined, id, ['device', 'host']),
     settings: null,

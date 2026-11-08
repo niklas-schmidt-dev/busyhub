@@ -11,6 +11,8 @@ function apply(state: HubSnapshot, event: HubEvent): HubSnapshot {
       return { ...state, runs: event.runs }
     case 'status':
       return { ...state, status: event.status }
+    case 'catalog':
+      return { ...state, catalog: event.status }
     case 'log':
       return { ...state, logs: [...state.logs.slice(-(MAX_LOGS - 1)), event.line] }
   }

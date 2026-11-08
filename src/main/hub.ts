@@ -8,6 +8,7 @@ import type {
   AppEntry,
   BarStatus,
   BusyInputEvent,
+  CatalogStatus,
   HubEvent,
   HubSnapshot,
   LogLine,
@@ -19,13 +20,14 @@ import type {
 } from '../shared/types.ts'
 import { Bar, errorText } from './bar.ts'
 import { buildProject, packageArtifacts, type Artifacts } from './builder.ts'
-import { projectAppmeta, scan, withBarApps, type BarApp } from './catalog.ts'
+import { projectAppmeta, scan, withBarApps, withCatalog, type BarApp } from './catalog.ts'
 import type { Config } from './config.ts'
 import type { HostInit, HostToMain } from './host-protocol.ts'
+import type { RemoteCatalog } from './remote-catalog.ts'
 import { createProject, importPackage } from './scaffold.ts'
 
 export interface HubPaths {
-  /** Folders of official apps: the repository's apps/ in development, the bundled builds in a release. */
+  /** Source folders of official apps: the repository's apps/ in development, nothing in a release. */
   official: string[]
   /** Where New app creates projects; always scanned. */
   appsFolder: string
@@ -52,6 +54,7 @@ interface HostRun {
 export class Hub {
   readonly #paths: HubPaths
   readonly #config: Config
+  readonly #catalog: RemoteCatalog
   readonly #emit: (event: HubEvent) => void
   #bar: Bar
   #status: BarStatus = { state: 'offline', error: 'Not checked yet' }
@@ -64,9 +67,10 @@ export class Hub {
   readonly #logs: LogLine[] = []
   readonly #input = new InputSynth((event) => this.#deliver(event))
 
-  constructor(paths: HubPaths, config: Config, emit: (event: HubEvent) => void) {
+  constructor(paths: HubPaths, config: Config, catalog: RemoteCatalog, emit: (event: HubEvent) => void) {
     this.#paths = paths
     this.#config = config
+    this.#catalog = catalog
     this.#emit = emit
     this.#bar = new Bar(config.barAddr, config.barPassword)
   }
@@ -75,6 +79,7 @@ export class Hub {
     return {
       bar: { addr: this.#config.barAddr, hasPassword: this.#config.barPassword !== null },
       appsFolder: this.#paths.appsFolder,
+      catalog: this.#catalog.status,
       status: this.#status,
       apps: this.#apps,
       runs: [...this.#runs.values()],
@@ -93,7 +98,9 @@ export class Hub {
 
   /** Every folder the catalog reads, for the file watchers. */
   watchedFolders(): string[] {
-    return [...this.#paths.official, this.#paths.appsFolder, this.#paths.packages, ...this.#config.folders].filter((dir) => existsSync(dir))
+    return [...this.#paths.official, this.#catalog.packagesDir, this.#paths.appsFolder, this.#paths.packages, ...this.#config.folders].filter((dir) =>
+      existsSync(dir),
+    )
   }
 
   /** Rescans the local catalog and asks the bar for its status and installed apps. */
@@ -105,7 +112,8 @@ export class Hub {
   /** Rescans apps/ and packages/ only, e.g. after a file changed. */
   rescan(): void {
     const { apps, problems } = scan({
-      official: this.#paths.official,
+      // Source projects first, so in development they shadow the downloaded copies of the same apps.
+      official: [...this.#paths.official, this.#catalog.packagesDir],
       local: [this.#paths.appsFolder, this.#paths.packages, ...this.#config.folders],
     })
     for (const problem of problems) this.#log(HUB_LOG, 'warn', `Skipped ${problem.path}: ${problem.error}`)
@@ -129,6 +137,20 @@ export class Hub {
       this.#emit({ type: 'status', status })
     }
     this.#publishApps()
+  }
+
+  /** Checks the online catalog; offline, the saved copy or the snapshot BusyHub shipped with stays in use. */
+  async refreshCatalog(): Promise<CatalogStatus> {
+    const status = await this.#catalog.refresh()
+    if (status.error) this.#log(HUB_LOG, 'warn', `Catalog not updated: ${status.error}. Showing ${status.state === 'bundled' ? 'the catalog that came with BusyHub' : 'the last catalog fetched'}.`)
+    this.#emit({ type: 'catalog', status })
+    this.#publishApps()
+    return status
+  }
+
+  /** Downloads an official app, or its update, so it runs without a connection from then on. */
+  async download(id: string): Promise<void> {
+    await this.#guarded(id, () => this.#fetchFromCatalog(this.#find(id)))
   }
 
   async connect(addr: string, password: string | null): Promise<BarStatus> {
@@ -235,16 +257,20 @@ export class Hub {
 
   async forget(id: string): Promise<void> {
     const app = this.#find(id)
-    if (app.official || !app.dir) throw new Error(`${app.name} is not a local app`)
+    const download = app.official && app.dir !== null && app.dir.startsWith(resolve(this.#catalog.packagesDir) + sep)
+    if ((app.official && !download) || !app.dir) throw new Error(`${app.name} is not a local app`)
     await this.#stopHost(id)
-    if (app.dir.startsWith(resolve(this.#paths.packages) + sep)) {
+    if (download) {
+      // The app stays in the catalog and can be downloaded again.
+      rmSync(app.dir, { recursive: true, force: true })
+    } else if (app.dir.startsWith(resolve(this.#paths.packages) + sep)) {
       rmSync(app.dir, { recursive: true, force: true })
     } else if (this.#config.folders.includes(app.dir)) {
       await this.#config.setFolders(this.#config.folders.filter((dir) => dir !== app.dir))
     } else {
       throw new Error(`${app.name} lives in ${app.dir}. Move or delete that folder to remove it.`)
     }
-    this.#log(HUB_LOG, 'info', `Removed ${app.name} from BusyHub`)
+    this.#log(HUB_LOG, 'info', download ? `Removed the download of ${app.name}; it stays in the catalog.` : `Removed ${app.name} from BusyHub`)
     this.rescan()
   }
 
@@ -276,8 +302,10 @@ export class Hub {
     this.#log(app.id, 'info', 'Launched on the bar. Hold Back on the bar to quit it there.')
   }
 
-  async #installOnBar(app: AppEntry): Promise<void> {
-    const artifacts = await this.#artifacts(app, 'device')
+  async #installOnBar(entry: AppEntry): Promise<void> {
+    const artifacts = await this.#artifacts(entry, 'device')
+    // A catalog app was just downloaded, so its settings schema is known only now.
+    const app = this.#find(entry.id)
     this.#setRun(app.id, 'device', 'installing', 'Uploading to the bar')
     const installed = await this.#bar.install(readFileSync(artifacts.tgz))
     this.#log(app.id, 'info', `Installed v${installed.version} on the bar.`)
@@ -295,8 +323,9 @@ export class Hub {
     })
   }
 
-  async #runHere(app: AppEntry): Promise<void> {
-    const { entry } = await this.#artifacts(app, 'host')
+  async #runHere(listed: AppEntry): Promise<void> {
+    const { entry } = await this.#artifacts(listed, 'host')
+    const app = this.#find(listed.id)
     this.#setRun(app.id, 'host', 'starting', 'Starting on this computer')
     const init: HostInit = {
       appId: app.id,
@@ -353,7 +382,24 @@ export class Hub {
       return buildProject(app.dir, app.id, this.#logFor(app.id))
     }
     if (app.source === 'package' && app.dir) return packageArtifacts(app.dir, app.id)
+    if (app.source === 'catalog') {
+      this.#setRun(app.id, mode, 'installing', 'Downloading from the catalog')
+      await this.#fetchFromCatalog(app)
+      const downloaded = this.#find(app.id)
+      if (downloaded.source !== 'package' || !downloaded.dir) throw new Error(`${app.name} could not be downloaded`)
+      return packageArtifacts(downloaded.dir, app.id)
+    }
     throw new Error(`${app.name} exists only on the bar; there is nothing to build or install.`)
+  }
+
+  async #fetchFromCatalog(app: AppEntry): Promise<void> {
+    // A run on this computer reads the files an update replaces.
+    if (this.#hosts.has(app.id)) {
+      this.#log(app.id, 'info', 'Stopping the run on this computer to update the app.')
+      await this.#stopHost(app.id)
+    }
+    await this.#catalog.download(app.id, app.source === 'catalog' ? null : app.version)
+    this.rescan()
   }
 
   /** Input goes to the most recently started run on this computer that listens, like the one app in front on the bar. */
@@ -362,14 +408,19 @@ export class Hub {
     target?.worker.postMessage({ type: 'input', event })
   }
 
+  /** One step per app at a time; a failure shows as the app's run state. */
   async #exclusive(id: string, mode: RunMode, work: () => Promise<void>): Promise<void> {
+    await this.#guarded(id, work, (message) => this.#setRun(id, mode, 'error', message))
+  }
+
+  async #guarded(id: string, work: () => Promise<void>, onError?: (message: string) => void): Promise<void> {
     if (this.#busy.has(id)) throw new Error('This app is busy with another step; wait for it to finish.')
     this.#busy.add(id)
     try {
       await work()
     } catch (err) {
       const message = errorText(err)
-      this.#setRun(id, mode, 'error', message)
+      onError?.(message)
       this.#log(id, 'error', message)
       throw new Error(message)
     } finally {
@@ -384,7 +435,7 @@ export class Hub {
   }
 
   #publishApps(): void {
-    this.#apps = withBarApps(this.#local, this.#barApps)
+    this.#apps = withBarApps(withCatalog(this.#local, this.#catalog.apps()), this.#barApps)
     this.#emit({ type: 'apps', apps: this.#apps })
   }
 

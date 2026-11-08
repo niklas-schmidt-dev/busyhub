@@ -1,9 +1,34 @@
 // Checks every official app against the catalog rules in CONTRIBUTING.md. CI runs it on every pull request.
 //   node scripts/check-apps.ts
+//   node scripts/check-apps.ts --changed-since origin/main   also require a higher version for apps whose code changed
+import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SettingsField } from '../src/shared/types.ts'
-import { FOLDER, officialFolders, readOfficialApp } from './official-apps.ts'
+import { compareVersions } from '../src/shared/version.ts'
+import { FOLDER, officialFolders, readOfficialApp, ROOT } from './official-apps.ts'
+
+const sinceFlag = process.argv.indexOf('--changed-since')
+const since = sinceFlag === -1 ? null : process.argv[sinceFlag + 1]
+if (sinceFlag !== -1 && !since) throw new Error('--changed-since needs a git ref, e.g. origin/main')
+
+const git = (args: string[]) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+
+/** BusyHub offers an update only when the version goes up, so changed code needs a higher version. */
+function versionProblem(folder: string, version: string): string | null {
+  if (!since) return null
+  if (!git(['diff', '--name-only', `${since}...HEAD`, '--', `apps/${folder}/src`])) return null
+  let before: string
+  try {
+    before = (JSON.parse(git(['show', `${since}:apps/${folder}/src/appmeta/manifest.json`])) as { version: string }).version
+  } catch {
+    // A new app has no earlier version.
+    return null
+  }
+  return compareVersions(version, before) > 0
+    ? null
+    : `manifest.json: the app's code changed, so raise its version above ${before}; otherwise nobody is offered the update`
+}
 
 const TAGLINE_MAX = 100
 const FIELD_TYPES = new Set(['boolean', 'integer', 'string', 'enum', 'color', 'time', 'geolocation', 'group'])
@@ -47,12 +72,18 @@ function check(folder: string): string[] {
     if (rawHub.accent !== undefined && (typeof rawHub.accent !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(rawHub.accent))) {
       problems.push('hub.json: accent must be a #RRGGBB color')
     }
+    if (rawHub.minHubVersion !== undefined && (typeof rawHub.minHubVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(rawHub.minHubVersion))) {
+      problems.push('hub.json: minHubVersion must be a BusyHub version like 0.2.0')
+    }
   }
 
   if (app.hasSettingsFile) {
     if (!app.settings) problems.push('settings.json: needs format_version, a numeric version and fields')
     else checkFields(app.settings.fields, '', problems)
   }
+
+  const bump = versionProblem(folder, manifest.version)
+  if (bump) problems.push(bump)
 
   if (!existsSync(join(dir, 'README.md'))) problems.push('README.md is missing: say what the app shows and how its controls work')
 

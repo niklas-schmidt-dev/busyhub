@@ -1,6 +1,7 @@
 name: Release
 
 # Push a tag like v0.2.0 to build installers for every platform and publish them as a GitHub release.
+# Releases are for BusyHub itself: apps reach people through the online catalog (catalog.yml) without one.
 on:
   push:
     tags: ['v*']
@@ -9,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  apps:
-    name: Official apps
+  catalog:
+    name: Catalog snapshot
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -21,16 +22,16 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm apps:check
-      - run: pnpm apps:build
+      - run: pnpm catalog:build
       - uses: actions/upload-artifact@v7
         with:
-          name: official-apps
-          path: build/official
+          name: catalog
+          path: build/catalog
           include-hidden-files: true
 
   package:
     name: Package (${{ matrix.name }})
-    needs: apps
+    needs: catalog
     strategy:
       fail-fast: false
       matrix:
@@ -55,8 +56,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v8
         with:
-          name: official-apps
-          path: build/official
+          name: catalog
+          path: build/catalog
       - run: pnpm build
       - run: pnpm exec electron-builder ${{ matrix.target }} --publish never
       - uses: actions/upload-artifact@v7

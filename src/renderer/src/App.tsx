@@ -100,6 +100,11 @@ export function App() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             onNew={() => setNewOpen(true)}
+            catalog={state?.catalog ?? null}
+            onCheckCatalog={async () => {
+              const status = await window.hub.refreshCatalog()
+              if (status.error) toast.warning(`Catalog not updated: ${status.error}`)
+            }}
           />
         </main>
         <aside className="min-h-0 min-w-0 overflow-y-auto border-l p-4" aria-label="Selected app">

@@ -14,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The full history lets the app check compare versions with the target branch.
+          fetch-depth: 0
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -26,11 +29,14 @@ jobs:
         run: pnpm test
       - name: Catalog rules for apps/
         run: pnpm apps:check
+      - name: Changed apps raise their version
+        if: github.event_name == 'pull_request'
+        run: pnpm apps:check --changed-since "origin/${{ github.base_ref }}"
       - name: README apps table is current
         run: pnpm apps:readme --check
       - name: Typecheck every app
         run: pnpm --filter "./apps/*" exec tsc
-      - name: Build every app
-        run: pnpm apps:build
+      - name: Build the catalog
+        run: pnpm catalog:build
       - name: Build BusyHub
         run: pnpm build

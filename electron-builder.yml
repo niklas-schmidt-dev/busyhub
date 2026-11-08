@@ -13,9 +13,13 @@ files:
   - package.json
 
 extraResources:
-  # Official apps, prebuilt by `pnpm apps:build`.
-  - from: build/official
-    to: official
+  # A snapshot of the official catalog (`pnpm catalog:build`), so a first start works without a connection.
+  # Newer apps and updates come from the online catalog; they never need a new release.
+  - from: build/catalog
+    to: catalog
+    filter:
+      - catalog.json
+      - packages/**
   # The starter for New app.
   - from: templates/starter
     to: template

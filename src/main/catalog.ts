@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AppEntry, HubMeta, RunMode, SettingsSchema } from '../shared/types.ts'
+import type { CatalogApp } from './catalog-feed.ts'
 
 /** The firmware's own check for an app id (js_app_is_valid_id). */
 export const APP_ID = /^[a-zA-Z0-9_-][a-zA-Z0-9_.-]{0,31}$/
@@ -112,11 +113,15 @@ function entryFrom(dir: string, official: boolean): AppEntry | null {
     settings: parseSettings(readOptionalJson(join(found.appmeta, 'settings.json'))),
     icon: iconFrom(found.appmeta),
     onBar: null,
+    catalog: null,
   }
 }
 
 export interface ScanSources {
-  /** Folders whose subfolders are official apps: the repository's apps/ in development, the bundled builds in a release. */
+  /**
+   * Folders whose subfolders are official apps, in order of precedence: the repository's apps/ in development,
+   * then the apps downloaded from the catalog. An earlier folder quietly shadows a later one with the same app.
+   */
   official: string[]
   /** Your folders: each is an app itself, or holds apps in its subfolders. Imported packages live in one of them. */
   local: string[]
@@ -144,6 +149,8 @@ export function scan(sources: ScanSources): ScanResult {
       const entry = entryFrom(dir, official)
       if (!entry) return
       const existing = apps.get(entry.id)
+      // A source project in development shadows the downloaded copy of the same official app.
+      if (existing?.official && official) return
       if (existing) throw new Error(`the id ${entry.id} is already used by ${existing.dir}`)
       apps.set(entry.id, entry)
     } catch (err) {
@@ -189,6 +196,7 @@ export function withBarApps(apps: AppEntry[], barApps: BarApp[] | null): AppEntr
       author: app.author,
       source: 'bar',
       official: false,
+      catalog: null,
       dir: null,
       hub: { category: 'Installed', tagline: '', accent: accentFor(app.id), modes: ['device'] },
       settings: null,
@@ -197,4 +205,33 @@ export function withBarApps(apps: AppEntry[], barApps: BarApp[] | null): AppEntr
     })
   }
   return merged.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * Joins the online catalog in: official apps on disk learn the version the catalog offers now (null once it is no
+ * longer listed), and listed apps that were never downloaded are added as available.
+ */
+export function withCatalog(apps: AppEntry[], catalog: CatalogApp[]): AppEntry[] {
+  const listed = new Map(catalog.map((app) => [app.id, app]))
+  const merged = apps.map((app) => (app.official ? { ...app, catalog: { latest: listed.get(app.id)?.version ?? null } } : app))
+  const present = new Set(apps.map((app) => app.id))
+  for (const app of catalog) {
+    if (present.has(app.id)) continue
+    merged.push({
+      id: app.id,
+      name: app.name,
+      version: app.version,
+      description: app.description,
+      author: app.author,
+      source: 'catalog',
+      official: true,
+      catalog: { latest: app.version },
+      dir: null,
+      hub: { category: app.category, tagline: app.tagline, accent: app.accent, modes: app.modes },
+      settings: null,
+      icon: app.icon,
+      onBar: null,
+    })
+  }
+  return merged
 }

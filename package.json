@@ -2,7 +2,7 @@
   "name": "busyhub",
   "productName": "BusyHub",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A desktop marketplace for BUSY Bar apps. Run every app on the bar or from your computer.",
   "license": "MIT",
   "author": "Niklas Schmidt (https://github.com/niklas-schmidt-dev)",
@@ -27,9 +27,9 @@
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
     "test": "node --test \"src/**/*.test.ts\"",
     "apps:check": "node scripts/check-apps.ts",
-    "apps:build": "node scripts/build-official-apps.ts",
     "apps:readme": "node scripts/apps-readme.ts",
-    "dist": "pnpm build && pnpm apps:build && electron-builder --publish never"
+    "dist": "pnpm build && pnpm catalog:build && electron-builder --publish never",
+    "catalog:build": "node scripts/build-catalog.ts"
   },
   "devDependencies": {
     "@base-ui/react": "^1.9.0",

@@ -30,7 +30,8 @@
 
 ## What it does
 
-- **One catalog.** Official apps from this repository, your own projects, `.tgz` packages, and the apps already installed on your bar, such as Clock and Weather.
+- **One catalog.** Official apps from this repository, your own projects, `.tgz` packages, and the apps already installed on your bar, such as Clock and Weather. New official apps and updates arrive without a new BusyHub release.
+- **Works offline.** Downloaded apps run without a connection, and BusyHub keeps its own copy of the catalog for when you're offline or GitHub is down.
 - **Two ways to run.** On the bar, an app keeps running without your computer. From your computer, it can keep API keys off the bar, run in the background and run next to other apps.
 - **Live view.** Both of the bar's screens are mirrored as they change. On-screen buttons and the wheel let you control an app without reaching for the bar.
 - **Settings without code.** Every app's `settings.json` becomes a form. Fields marked secret stay on your computer.
@@ -82,7 +83,11 @@ These apps come with BusyHub. Each one is a folder in [`apps/`](apps):
 | [**Spend Meter**](apps/spend-meter) | Your AI spend against a budget. Point it at Passcard's read API. | Computer · Bar | [@niklas-schmidt-dev](https://github.com/niklas-schmidt-dev) |
 <!-- apps:end -->
 
-Apps added to the catalog ship with the next BusyHub release. You don't need the catalog to run something, though: anything you build or download runs locally just the same.
+The catalog is published from this repository to GitHub Pages. A merged app shows up in everyone's BusyHub within minutes, without a new BusyHub release: click **Download**, then **Run**. When an app's version goes up, BusyHub offers **Update**.
+
+Offline, BusyHub uses the catalog it last saw; every release also ships a copy of the catalog and its apps, so even a first start without a connection has something to run. Apps you've downloaded keep working either way.
+
+You don't need the catalog to run something, though: anything you build or download runs locally just the same.
 
 ## Make your own app
 
@@ -108,15 +113,16 @@ An optional `hub.json` next to `package.json` sets how the catalog shows an app:
   "category": "Fun",
   "tagline": "A pixel ball with a trail. Spin the wheel to speed it up.",
   "accent": "#FF5A4F",
-  "modes": ["device", "host"]
+  "modes": ["device", "host"],
+  "minHubVersion": "0.2.0"
 }
 ```
 
-`modes` lists where the app can run: `device` is the bar, `host` is your computer. The first one is the default.
+`modes` lists where the app can run: `device` is the bar, `host` is your computer. The first one is the default. `minHubVersion` is the oldest BusyHub the app works with; older ones don't list it until they're updated.
 
 ## Add your app to the catalog
 
-Built something others would enjoy? Fork this repository, copy your app into `apps/<name>`, and open a pull request. CI checks the app and builds it, and a maintainer reviews it. Once merged, it ships with the next release for everyone. [CONTRIBUTING.md](CONTRIBUTING.md) has the steps and the catalog rules.
+Built something others would enjoy? Fork this repository, copy your app into `apps/<name>`, and open a pull request. CI checks the app and builds it, and a maintainer reviews it. Once merged, it's in everyone's catalog within minutes. [CONTRIBUTING.md](CONTRIBUTING.md) has the steps and the catalog rules.
 
 ## Develop BusyHub
 
@@ -132,6 +138,7 @@ pnpm dev
 | `pnpm dev` | BusyHub with hot reload; official apps are built from `apps/` |
 | `pnpm typecheck` · `pnpm test` | Types and unit tests |
 | `pnpm apps:check` | Checks every app in `apps/` against the catalog rules |
+| `pnpm catalog:build` | The catalog as GitHub Pages serves it, in `build/catalog/` |
 | `pnpm dist` | Installers for your platform in `release/` |
 
 <details>
@@ -141,6 +148,7 @@ pnpm dev
 src/main/        Electron main process
   hub.ts         the catalog, the bar connection, and every run on the bar or on this computer
   catalog.ts     finds official apps, your folders and packages; merges the bar's own app list
+  remote-catalog.ts  the online catalog: fetch, offline cache, verified downloads
   bar.ts         busy-lib client, plus app launch and quit
   builder.ts     runs the project's busy-cli on BusyHub's own Node
   host-worker.ts the runtime for an app that runs on your computer
@@ -150,8 +158,10 @@ src/renderer/    the interface: React, shadcn/ui, ReUI
 src/shared/      types and logic shared by both sides
 apps/            the official catalog
 templates/       the starter for New app
-scripts/         catalog checks, the official apps build, this README's apps table
+scripts/         catalog checks, the catalog build, this README's apps table
 ```
+
+**The catalog** is `catalog.json` plus one `.tgz` per app, built from `apps/` on every merge to `main` and served by GitHub Pages. BusyHub checks it at start and every six hours, and keeps the last copy it saw. A download is checked against the size and SHA-256 that `catalog.json` lists, and comes only from the catalog's own host over HTTPS. When the release ships the very same package, BusyHub installs that copy without downloading. When a download fails, it uses the shipped copy instead, but never one older than the version you have.
 
 **On the bar**, BusyHub builds the app with `busy-cli`, uploads the package through the bar's HTTP API and launches it.
 
@@ -166,10 +176,11 @@ scripts/         catalog checks, the official apps build, this README's apps tab
 ## Security and limits
 
 - An app running on your computer has your user's permissions. Official apps are reviewed before they are merged; run anything else only when you trust it.
+- Catalog downloads are verified against the checksums in `catalog.json`. Both come from this repository's GitHub Pages, so they protect against broken or tampered downloads, not against a compromised repository.
 - The window's content security policy allows `'unsafe-eval'`, because busy-lib's live-view worker decodes the bar's data with generated code. The window loads only BusyHub's own bundled code and shows app data as plain text.
 - The bar's own buttons reach an app running on your computer through the bar's state stream. Whatever the bar shows at the time sees the same presses.
 - BusyHub only knows an app is running on the bar if it launched it there. If you quit the app on the bar itself (hold Back), BusyHub still shows it as running.
-- Releases are not yet signed by Apple or Microsoft, and there are no automatic updates yet.
+- Releases are not yet signed by Apple or Microsoft, and BusyHub doesn't update itself yet. Apps update through the catalog.
 
 Found a security problem? See [SECURITY.md](SECURITY.md).
 

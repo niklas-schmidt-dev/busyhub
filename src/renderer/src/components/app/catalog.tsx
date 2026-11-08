@@ -1,6 +1,7 @@
-import { BadgeCheckIcon, LayoutGridIcon, PlusIcon, SearchIcon, SearchXIcon } from 'lucide-react'
+import { BadgeCheckIcon, LayoutGridIcon, PlusIcon, RefreshCwIcon, SearchIcon, SearchXIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { cn } from 'cn'
+import { Badge } from '@/components/reui/badge'
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '@/components/reui/frame'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
@@ -9,11 +10,69 @@ import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/comp
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import type { AppEntry, RunState } from '../../../../shared/types.ts'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { ago, day } from '@/lib/apps'
+import type { AppEntry, CatalogStatus, RunState } from '../../../../shared/types.ts'
 import { AppIcon } from './app-icon'
 import { RunBadge } from './run-badge'
 
 type Scope = 'all' | 'official' | 'mine' | 'bar' | 'running'
+
+/** Where the official apps on screen come from, in a few words. */
+function catalogLine(status: CatalogStatus): string {
+  switch (status.state) {
+    case 'live':
+      return status.fetchedAt ? `Official catalog checked ${ago(status.fetchedAt)}` : 'Official catalog is current'
+    case 'cached':
+      return `Showing the catalog from ${day(status.generatedAt)}. Downloaded apps work as usual.`
+    case 'bundled':
+      return `Showing the catalog that came with BusyHub (${day(status.generatedAt)}).`
+    case 'unavailable':
+      return 'The official catalog could not be loaded yet.'
+  }
+}
+
+/** The catalog's freshness, an Offline badge when it could not be reached, and a button to check again. */
+function CatalogState({ status, onCheck }: { status: CatalogStatus; onCheck: () => Promise<void> }) {
+  const [checking, setChecking] = useState(false)
+  const offline = status.error !== null || status.state === 'unavailable'
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      {offline && (
+        <Tooltip>
+          <TooltipTrigger render={<Badge variant="warning-light" />}>Offline</TooltipTrigger>
+          <TooltipContent>{status.error ? `Could not reach the catalog: ${status.error}` : 'Not checked yet'}</TooltipContent>
+        </Tooltip>
+      )}
+      <FrameDescription className="truncate text-xs" role="status">
+        {catalogLine(status)}
+      </FrameDescription>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Check the catalog for new apps and updates"
+              disabled={checking}
+              onClick={async () => {
+                setChecking(true)
+                try {
+                  await onCheck()
+                } finally {
+                  setChecking(false)
+                }
+              }}
+            />
+          }
+        >
+          <RefreshCwIcon aria-hidden className={cn(checking && 'motion-safe:animate-spin')} />
+        </TooltipTrigger>
+        <TooltipContent>Check for new apps and updates</TooltipContent>
+      </Tooltip>
+    </div>
+  )
+}
 
 const SCOPES: Array<{ value: Scope; label: string }> = [
   { value: 'all', label: 'All' },
@@ -93,10 +152,14 @@ export function Catalog({
   selectedId,
   onSelect,
   onNew,
+  catalog,
+  onCheckCatalog,
 }: {
   apps: AppEntry[]
   runs: RunState[]
   loading: boolean
+  catalog: CatalogStatus | null
+  onCheckCatalog: () => Promise<void>
   selectedId: string | null
   onSelect: (id: string) => void
   onNew: () => void
@@ -124,11 +187,13 @@ export function Catalog({
   return (
     <Frame spacing="sm">
       <FrameHeader className="flex-row flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col gap-0.5">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <FrameTitle>Apps</FrameTitle>
-          <FrameDescription className="text-xs">
-            Official apps, your own projects and packages, and what is installed on the bar.
-          </FrameDescription>
+          {catalog ? (
+            <CatalogState status={catalog} onCheck={onCheckCatalog} />
+          ) : (
+            <FrameDescription className="text-xs">Loading the catalog…</FrameDescription>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ToggleGroup
