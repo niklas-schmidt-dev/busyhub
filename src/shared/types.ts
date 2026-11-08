@@ -155,8 +155,8 @@ export interface HubApi {
   refreshCatalog(): Promise<CatalogStatus>
   /** Downloads an official app, or its newer version, so it also runs offline. */
   download(id: string): Promise<void>
-  /** Address and password for the renderer's live state stream. */
-  streamConfig(): Promise<{ addr: string; password: string | null }>
+  /** Address and password for the renderer's live view: addr (host[:port]) for the state stream, origin for plain requests. */
+  streamConfig(): Promise<{ addr: string; origin: string; password: string | null }>
   run(id: string, mode: RunMode): Promise<void>
   stop(id: string): Promise<void>
   install(id: string): Promise<void>
