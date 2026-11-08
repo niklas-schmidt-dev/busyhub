@@ -30,7 +30,7 @@
 
 ## What it does
 
-- **One catalog.** Official apps from this repository, your own projects, `.tgz` packages, and the apps already installed on your bar, such as Clock and Weather. New official apps and updates arrive without a new BusyHub release.
+- **One catalog, three kinds of apps.** BUSY's own apps on your bar, such as Clock and Weather; official BusyHub apps from this repository; and your own projects and `.tgz` packages. Each kind has its own section. New official apps and updates arrive without a new BusyHub release.
 - **Works offline.** Downloaded apps run without a connection, and BusyHub keeps its own copy of the catalog for when you're offline or GitHub is down.
 - **Two ways to run.** On the bar, an app keeps running without your computer. From your computer, it can keep API keys off the bar, run in the background and run next to other apps.
 - **Live view.** Both of the bar's screens are mirrored as they change. On-screen buttons and the wheel let you control an app without reaching for the bar.

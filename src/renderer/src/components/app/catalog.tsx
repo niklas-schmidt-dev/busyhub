@@ -11,12 +11,12 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ago, day } from '@/lib/apps'
+import { ago, appOrigin, day, type AppOrigin } from '@/lib/apps'
 import type { AppEntry, CatalogStatus, RunState } from '../../../../shared/types.ts'
 import { AppIcon } from './app-icon'
 import { RunBadge } from './run-badge'
 
-type Scope = 'all' | 'official' | 'mine' | 'bar' | 'running'
+type Scope = 'all' | 'bar' | 'running'
 
 /** Where the official apps on screen come from, in a few words. */
 function catalogLine(status: CatalogStatus): string {
@@ -76,10 +76,15 @@ function CatalogState({ status, onCheck }: { status: CatalogStatus; onCheck: () 
 
 const SCOPES: Array<{ value: Scope; label: string }> = [
   { value: 'all', label: 'All' },
-  { value: 'official', label: 'Official' },
-  { value: 'mine', label: 'Mine' },
   { value: 'bar', label: 'On the bar' },
   { value: 'running', label: 'Running' },
+]
+
+/** The grid is grouped by who made an app; the toggles above it filter by state. */
+const SECTIONS: Array<{ origin: AppOrigin; title: string; description: string }> = [
+  { origin: 'busy', title: 'From BUSY', description: 'Made by BUSY and installed on your bar.' },
+  { origin: 'busyhub', title: 'BusyHub', description: 'Official apps from the BusyHub catalog, reviewed before they are added.' },
+  { origin: 'own', title: 'Your apps', description: 'Projects, folders and packages you added.' },
 ]
 
 const ALL_CATEGORIES = 'all'
@@ -87,10 +92,6 @@ const GRID = 'grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-2'
 
 function inScope(app: AppEntry, run: RunState | undefined, scope: Scope): boolean {
   switch (scope) {
-    case 'official':
-      return app.official
-    case 'mine':
-      return !app.official && app.source !== 'bar'
     case 'bar':
       return app.onBar !== null
     case 'running':
@@ -128,7 +129,7 @@ function AppTile({
           <span className="flex min-w-0 items-center gap-1">
             <span className="truncate">{app.name}</span>
             {app.official && (
-              <BadgeCheckIcon className="size-3.5 shrink-0 text-muted-foreground" role="img" aria-label="Official app" />
+              <BadgeCheckIcon className="size-3.5 shrink-0 text-muted-foreground" role="img" aria-label="Official BusyHub app" />
             )}
           </span>
           <span className="shrink-0 text-xs font-normal text-muted-foreground tabular-nums">v{app.version}</span>
@@ -171,6 +172,7 @@ export function Catalog({
   const categories = useMemo(() => [...new Set(apps.map((app) => app.hub.category))].sort(), [apps])
 
   const needle = query.trim().toLowerCase()
+  const filtering = needle !== '' || scope !== 'all' || category !== ALL_CATEGORIES
   const visible = apps.filter(
     (app) =>
       inScope(app, runById.get(app.id), scope) &&
@@ -285,16 +287,46 @@ export function Catalog({
             </EmptyContent>
           </Empty>
         ) : (
-          <div className={GRID}>
-            {visible.map((app) => (
-              <AppTile
-                key={app.id}
-                app={app}
-                run={runById.get(app.id)}
-                selected={app.id === selectedId}
-                onSelect={() => onSelect(app.id)}
-              />
-            ))}
+          <div className="flex flex-col gap-5">
+            {SECTIONS.map((section) => {
+              const list = visible.filter((app) => appOrigin(app) === section.origin)
+              // Your apps stays visible while empty, to show how to add one; the others only appear with something in them.
+              if (list.length === 0 && (filtering || section.origin !== 'own')) return null
+              return (
+                <section key={section.origin} aria-labelledby={`apps-${section.origin}`} className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-0.5">
+                    <h3 id={`apps-${section.origin}`} className="text-sm font-medium">
+                      {section.title}
+                    </h3>
+                    <span className="text-xs text-muted-foreground tabular-nums">{list.length}</span>
+                    <p className="text-xs text-muted-foreground">{section.description}</p>
+                  </div>
+                  {list.length > 0 ? (
+                    <div className={GRID}>
+                      {list.map((app) => (
+                        <AppTile
+                          key={app.id}
+                          app={app}
+                          run={runById.get(app.id)}
+                          selected={app.id === selectedId}
+                          onSelect={() => onSelect(app.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex min-h-[6.5rem] flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-4">
+                      <p className="max-w-md text-sm text-muted-foreground">
+                        Nothing of your own yet. New app starts from a template; Add folder… links an app you already have.
+                      </p>
+                      <Button variant="outline" size="sm" onClick={onNew}>
+                        <PlusIcon aria-hidden />
+                        New app
+                      </Button>
+                    </div>
+                  )}
+                </section>
+              )
+            })}
           </div>
         )}
       </FramePanel>

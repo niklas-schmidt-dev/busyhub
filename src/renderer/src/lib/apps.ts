@@ -1,6 +1,22 @@
 import { compareVersions } from '../../../shared/version.ts'
 import type { AppEntry } from '../../../shared/types.ts'
 
+/** Who an app comes from: BUSY itself, BusyHub's official catalog, or the person using BusyHub. */
+export type AppOrigin = 'busy' | 'busyhub' | 'own'
+
+/** BUSY's own apps (Clock, Weather, the JS example) use the app.busy namespace. */
+const BUSY_APP_ID = /^app\.busy\./
+
+/**
+ * Official catalog apps first; then BUSY's apps as the bar lists them. A local project with a BUSY id, such as an
+ * edited copy of the JS example, is the user's own.
+ */
+export function appOrigin(app: Pick<AppEntry, 'id' | 'official' | 'source'>): AppOrigin {
+  if (app.official) return 'busyhub'
+  if (app.source === 'bar' && BUSY_APP_ID.test(app.id)) return 'busy'
+  return 'own'
+}
+
 /** A downloaded official app whose catalog version is newer than the copy on this computer. */
 export function hasUpdate(app: AppEntry): boolean {
   const latest = app.catalog?.latest
