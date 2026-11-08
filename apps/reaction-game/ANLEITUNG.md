@@ -106,7 +106,7 @@ Jede Änderung: Datei ändern oder Einstellung speichern, **Run** drücken, ausp
 
 Die Uhr startet, wenn die Bar bestätigt, dass `LOS!` auf dem Bildschirm steht, und stoppt beim Herunterdrücken der Taste (nicht beim Loslassen).
 
-- **Auf der Bar:** In vier Testrunden drückte ein Programm die Taste etwa 15 ms, nachdem `LOS!` im Bildspeicher der Bar stand. Das Spiel zeigte 12 bis 31 ms. Ein Teil davon ist der Weg des Testprogramms zur Taste; der Fehler des Spiels selbst bleibt also bei etwa 15 ms.
+- **Auf der Bar:** In fünf Testrunden drückte ein Programm die Taste 12 bis 15 ms, nachdem es `LOS!` im Bildspeicher der Bar gesehen hatte. Das Spiel zeigte 12 bis 35 ms. Das Programm schaut nur alle 20 bis 30 ms auf die Anzeige; genauer als «auf einige Hundertstelsekunden» lässt sich das so nicht sagen.
 - **Auf dem Computer:** Die Bestätigung muss erst über USB zurück, die Uhr startet zu spät. Drücke etwa 60 ms nach `LOS!` zeigte das Spiel als 22 bis 48 ms an.
 - **Nicht gemessen:** wie lange die LEDs nach dem Bildspeicher zum Leuchten brauchen und wie lange die Taste zum Erkennen braucht. Beides kommt noch etwas dazu.
 
